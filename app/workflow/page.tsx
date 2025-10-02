@@ -34,8 +34,8 @@ export default function WorkflowPage() {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('ingestion');
   const [selectedMethod, setSelectedMethod] = useState<IngestionMethod>(null);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
-  const [excelData, setExcelData] = useState<{invoices: any[], purchaseOrders: any[]} | null>(null);
-  const [pdfData, setPdfData] = useState<{invoices: any[], purchaseOrders: any[]} | null>(null);
+  const [excelData, setExcelData] = useState<{invoices: Record<string, unknown>[], purchaseOrders: Record<string, unknown>[]} | null>(null);
+  const [pdfData, setPdfData] = useState<{invoices: Record<string, unknown>[], purchaseOrders: Record<string, unknown>[]} | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [processedResults, setProcessedResults] = useState<ProcessedResult[]>([]);
@@ -205,8 +205,8 @@ export default function WorkflowPage() {
         const invoiceSheet = workbook.Sheets[workbook.SheetNames[0]];
         const poSheet = workbook.Sheets[workbook.SheetNames[1]];
         
-        const invoices = XLSX.utils.sheet_to_json(invoiceSheet);
-        const purchaseOrders = XLSX.utils.sheet_to_json(poSheet);
+        const invoices = XLSX.utils.sheet_to_json(invoiceSheet) as Record<string, unknown>[];
+        const purchaseOrders = XLSX.utils.sheet_to_json(poSheet) as Record<string, unknown>[];
         
         setExcelData({ invoices, purchaseOrders });
         setToastType('success');

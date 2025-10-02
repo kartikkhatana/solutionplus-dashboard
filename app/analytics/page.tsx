@@ -189,13 +189,6 @@ export default function AnalyticsPage() {
     financial: validationMetrics.filter(m => m.category === 'financial')
   };
 
-  const errorTrends = [
-    { month: 'Jan', document: 45, supplier: 32, financial: 28 },
-    { month: 'Feb', document: 42, supplier: 35, financial: 31 },
-    { month: 'Mar', document: 38, supplier: 29, financial: 25 },
-    { month: 'Apr', document: 35, supplier: 27, financial: 22 },
-    { month: 'May', document: 32, supplier: 24, financial: 19 }
-  ];
 
   return (
     <div className="flex min-h-screen bg-[#fafafa]">

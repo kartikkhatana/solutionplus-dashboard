@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 
 export default function DashboardPage() {
-  const [timeRange, setTimeRange] = useState('20 Jun. 2022 - 20 Jul. 2022');
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
 
   const [realtimeData, setRealtimeData] = useState({
@@ -41,7 +40,7 @@ export default function DashboardPage() {
     { name: 'Digital Systems Inc', amount: 342789.99, invoices: '867 pcs', status: 'active', statusColor: 'green' }
   ];
 
-  const generateSmoothPath = (data: any[]) => {
+  const generateSmoothPath = (data: { day: number; value: number }[]) => {
     const width = 600;
     const height = 200;
     const padding = 20;
@@ -121,8 +120,8 @@ export default function DashboardPage() {
                 </svg>
               </button>
             </div>
-            <p className="text-xs text-slate-500 mb-2">Processing accuracy</p>
-            <p className="text-2xl font-bold text-slate-900 mb-2">{realtimeData.processingRate.toFixed(1)}%</p>
+              <p className="text-xs text-slate-500 mb-2">Processing accuracy</p>
+              <p className="text-2xl font-bold text-slate-900 mb-2">{realtimeData.processingRate.toFixed(1)}%</p>
             <div className="flex items-center text-xs">
               <svg className="w-3 h-3 text-green-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" />
