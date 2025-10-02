@@ -1,11 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import Select from 'react-select';
 import Sidebar from '../components/Sidebar';
 
 export default function AnalyticsPage() {
-  const [timeRange, setTimeRange] = useState('30d');
+  const [timeRange, setTimeRange] = useState({ value: '30d', label: 'Last 30 days' });
   const [selectedCategory, setSelectedCategory] = useState('overview');
+
+  const timeRangeOptions = [
+    { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
+    { value: '90d', label: 'Last 90 days' },
+    { value: '6m', label: 'Last 6 months' }
+  ];
 
   // Base data for different time ranges
   const allData = {
@@ -77,8 +85,73 @@ export default function AnalyticsPage() {
   };
 
   // Get current data based on selected time range
-  const monthlyData = allData[timeRange as keyof typeof allData].monthly;
-  const currentMetrics = allData[timeRange as keyof typeof allData].metrics;
+  const monthlyData = allData[timeRange.value as keyof typeof allData].monthly;
+  const currentMetrics = allData[timeRange.value as keyof typeof allData].metrics;
+
+  // Custom styles for react-select to match theme
+  const customSelectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: '44px',
+      borderRadius: '0.75rem',
+      borderColor: state.isFocused ? '#0f172a' : '#e2e8f0',
+      boxShadow: state.isFocused ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' : '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+      '&:hover': {
+        backgroundColor: '#f8fafc',
+        borderColor: '#e2e8f0'
+      },
+      cursor: 'pointer',
+      backgroundColor: 'white',
+      transition: 'all 0.2s'
+    }),
+    valueContainer: (base: any) => ({
+      ...base,
+      padding: '0 1rem',
+      fontWeight: '500',
+      fontSize: '0.875rem'
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: '#0f172a'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      borderRadius: '0.75rem',
+      marginTop: '0.25rem',
+      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+      border: '1px solid #e2e8f0',
+      overflow: 'hidden'
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      padding: '0.25rem',
+      borderRadius: '0.75rem'
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#0f172a' : state.isFocused ? '#f1f5f9' : 'white',
+      color: state.isSelected ? 'white' : '#0f172a',
+      cursor: 'pointer',
+      borderRadius: '0.5rem',
+      padding: '0.5rem 0.75rem',
+      fontSize: '0.875rem',
+      fontWeight: state.isSelected ? '500' : '400',
+      transition: 'all 0.15s',
+      '&:active': {
+        backgroundColor: state.isSelected ? '#0f172a' : '#e2e8f0'
+      }
+    }),
+    indicatorSeparator: () => ({
+      display: 'none'
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: '#64748b',
+      '&:hover': {
+        color: '#0f172a'
+      }
+    })
+  };
 
   const validationMetrics = [
     { name: 'Duplicate Check', successRate: 99.8, failures: 8, category: 'document' },
@@ -125,29 +198,28 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[#fafafa]">
       <Sidebar />
       
-      <main className="flex-1 ml-64 p-6">
+      <main className="flex-1 ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Analytics</h1>
-              <p className="text-gray-500 text-sm mt-1">Invoice validation insights</p>
+              <h1 className="text-3xl font-bold text-slate-900 mb-1">Analytics</h1>
+              <p className="text-sm text-slate-500">Invoice validation insights</p>
             </div>
             <div className="flex items-center gap-3">
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="6m">Last 6 months</option>
-              </select>
-              <button className="px-3 py-2 text-sm bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="min-w-[180px]">
+                <Select
+                  value={timeRange}
+                  onChange={(option) => option && setTimeRange(option)}
+                  options={timeRangeOptions}
+                  styles={customSelectStyles}
+                  isSearchable={false}
+                />
+              </div>
+              <button className="px-4 py-3 text-sm bg-slate-900 border border-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors font-medium shadow-sm">
                 Export
               </button>
             </div>
@@ -155,41 +227,41 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg p-5 border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600">Processing Time</p>
-              <span className="text-xs text-green-600 font-medium">{currentMetrics.trends.processing}</span>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">Processing Time</p>
+            <p className="text-2xl font-bold text-slate-900 mb-2">{currentMetrics.avgProcessingTime}</p>
+            <div className="flex items-center text-xs">
+              <span className="text-green-500 font-medium">{currentMetrics.trends.processing}</span>
+              <span className="text-slate-400 ml-1">per invoice</span>
             </div>
-            <p className="text-2xl font-semibold text-gray-900">{currentMetrics.avgProcessingTime}</p>
-            <p className="text-xs text-gray-500 mt-1">Per invoice</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600">Match Accuracy</p>
-              <span className="text-xs text-green-600 font-medium">{currentMetrics.trends.accuracy}</span>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">Match Accuracy</p>
+            <p className="text-2xl font-bold text-slate-900 mb-2">{currentMetrics.matchAccuracy}</p>
+            <div className="flex items-center text-xs">
+              <span className="text-green-500 font-medium">{currentMetrics.trends.accuracy}</span>
+              <span className="text-slate-400 ml-1">{timeRange.value === '7d' ? 'last 7 days' : timeRange.value === '30d' ? 'last 30 days' : timeRange.value === '90d' ? 'last 90 days' : 'last 6 months'}</span>
             </div>
-            <p className="text-2xl font-semibold text-gray-900">{currentMetrics.matchAccuracy}</p>
-            <p className="text-xs text-gray-500 mt-1">{timeRange === '7d' ? 'Last 7 days' : timeRange === '30d' ? 'Last 30 days' : timeRange === '90d' ? 'Last 90 days' : 'Last 6 months'}</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600">Cost Savings</p>
-              <span className="text-xs text-green-600 font-medium">{currentMetrics.trends.savings}</span>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">Cost Savings</p>
+            <p className="text-2xl font-bold text-slate-900 mb-2">{currentMetrics.costSavings}</p>
+            <div className="flex items-center text-xs">
+              <span className="text-green-500 font-medium">{currentMetrics.trends.savings}</span>
+              <span className="text-slate-400 ml-1">{timeRange.value === '7d' ? 'this week' : timeRange.value === '30d' ? 'this month' : timeRange.value === '90d' ? 'this quarter' : 'last 6 months'}</span>
             </div>
-            <p className="text-2xl font-semibold text-gray-900">{currentMetrics.costSavings}</p>
-            <p className="text-xs text-gray-500 mt-1">{timeRange === '7d' ? 'This week' : timeRange === '30d' ? 'This month' : timeRange === '90d' ? 'This quarter' : 'Last 6 months'}</p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600">Error Rate</p>
-              <span className="text-xs text-green-600 font-medium">{currentMetrics.trends.errors}</span>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">Error Rate</p>
+            <p className="text-2xl font-bold text-slate-900 mb-2">{currentMetrics.errorRate}</p>
+            <div className="flex items-center text-xs">
+              <span className="text-green-500 font-medium">{currentMetrics.trends.errors}</span>
+              <span className="text-slate-400 ml-1">below target</span>
             </div>
-            <p className="text-2xl font-semibold text-gray-900">{currentMetrics.errorRate}</p>
-            <p className="text-xs text-gray-500 mt-1">Below target</p>
           </div>
         </div>
 

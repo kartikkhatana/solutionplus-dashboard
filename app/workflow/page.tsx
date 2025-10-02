@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import JSZip from 'jszip';
 
 type WorkflowStep = 'ingestion' | 'processing' | 'output' | 'delivery';
 type IngestionMethod = 'pdf' | 'email' | 'mongodb' | 'azure' | 'fusion' | 'excel' | null;
@@ -397,14 +398,14 @@ export default function WorkflowPage() {
               id: 1, 
               invoice: 'INV-2024-001', 
               po: 'PO-2024-156', 
-              vendor: 'TechSupply Corp', 
+              vendor: 'Sea Shell', 
               amount: 15750, 
               status: 'success', 
-              score: 98,
+              score: 100,
               source: 'Email Integration',
               fieldComparisons: [
                 { field: 'PO Number', poValue: 'PO-2024-156', invoiceValue: 'PO-2024-156', match: true },
-                { field: 'Vendor Name', poValue: 'TechSupply Corp', invoiceValue: 'TechSupply Corp', match: true },
+                { field: 'Vendor Name', poValue: 'Sea Shell', invoiceValue: 'Sea Shell', match: true },
                 { field: 'Invoice Date', poValue: '2024-01-15', invoiceValue: '2024-01-15', match: true },
                 { field: 'Total Amount', poValue: '$15,750.00', invoiceValue: '$15,750.00', match: true },
                 { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
@@ -417,14 +418,14 @@ export default function WorkflowPage() {
               id: 2, 
               invoice: 'INV-2024-002', 
               po: 'PO-2024-157', 
-              vendor: 'Office Solutions', 
+              vendor: 'Etisalat', 
               amount: 8450, 
-              status: 'success', 
-              score: 95,
+              status: 'warning', 
+              score: 87,
               source: 'Email Integration',
               fieldComparisons: [
                 { field: 'PO Number', poValue: 'PO-2024-157', invoiceValue: 'PO-2024-157', match: true },
-                { field: 'Vendor Name', poValue: 'Office Solutions', invoiceValue: 'Office Solutions', match: true },
+                { field: 'Vendor Name', poValue: 'Etisalat', invoiceValue: 'Etisalat', match: true },
                 { field: 'Invoice Date', poValue: '2024-01-18', invoiceValue: '2024-01-18', match: true },
                 { field: 'Total Amount', poValue: '$8,450.00', invoiceValue: '$8,450.00', match: true },
                 { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
@@ -437,14 +438,14 @@ export default function WorkflowPage() {
               id: 3, 
               invoice: 'INV-2024-003', 
               po: 'PO-2024-158', 
-              vendor: 'Digital Systems', 
+              vendor: 'ADNOC', 
               amount: 23200, 
               status: 'success', 
-              score: 97,
+              score: 100,
               source: 'Email Integration',
               fieldComparisons: [
                 { field: 'PO Number', poValue: 'PO-2024-158', invoiceValue: 'PO-2024-158', match: true },
-                { field: 'Vendor Name', poValue: 'Digital Systems', invoiceValue: 'Digital Systems', match: true },
+                { field: 'Vendor Name', poValue: 'ADNOC', invoiceValue: 'ADNOC', match: true },
                 { field: 'Invoice Date', poValue: '2024-01-20', invoiceValue: '2024-01-20', match: true },
                 { field: 'Total Amount', poValue: '$23,200.00', invoiceValue: '$23,200.00', match: true },
                 { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
@@ -457,14 +458,14 @@ export default function WorkflowPage() {
               id: 4, 
               invoice: 'INV-2024-004', 
               po: 'PO-2024-159', 
-              vendor: 'Global Trading', 
+              vendor: 'MDC Business Management (ADNOC)', 
               amount: 12890, 
               status: 'warning', 
-              score: 67,
+              score: 62,
               source: 'Email Integration',
               fieldComparisons: [
                 { field: 'PO Number', poValue: 'PO-2024-159', invoiceValue: 'PO-2024-159', match: true },
-                { field: 'Vendor Name', poValue: 'Global Trading', invoiceValue: 'Global Trading Co', match: false },
+                { field: 'Vendor Name', poValue: 'MDC Business Management (ADNOC)', invoiceValue: 'MDC Business Management', match: false },
                 { field: 'Invoice Date', poValue: '2024-01-22', invoiceValue: '2024-01-25', match: false },
                 { field: 'Total Amount', poValue: '$12,890.00', invoiceValue: '$12,990.00', match: false },
                 { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
@@ -477,14 +478,14 @@ export default function WorkflowPage() {
               id: 5, 
               invoice: 'INV-2024-005', 
               po: 'PO-2024-160', 
-              vendor: 'Enterprise Hardware', 
+              vendor: 'CFCE Integrated Facilities Management (ADNOC)', 
               amount: 45600, 
               status: 'success', 
-              score: 99,
+              score: 100,
               source: 'Email Integration',
               fieldComparisons: [
                 { field: 'PO Number', poValue: 'PO-2024-160', invoiceValue: 'PO-2024-160', match: true },
-                { field: 'Vendor Name', poValue: 'Enterprise Hardware', invoiceValue: 'Enterprise Hardware', match: true },
+                { field: 'Vendor Name', poValue: 'CFCE Integrated Facilities Management (ADNOC)', invoiceValue: 'CFCE Integrated Facilities Management (ADNOC)', match: true },
                 { field: 'Invoice Date', poValue: '2024-01-28', invoiceValue: '2024-01-28', match: true },
                 { field: 'Total Amount', poValue: '$45,600.00', invoiceValue: '$45,600.00', match: true },
                 { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
@@ -557,6 +558,54 @@ export default function WorkflowPage() {
     }
   };
 
+  // Delivery configuration states
+  const [showEmailConfig, setShowEmailConfig] = useState(false);
+  const [showMongoConfig, setShowMongoConfig] = useState(false);
+  const [showRestApiConfig, setShowRestApiConfig] = useState(false);
+  const [showErpConfig, setShowErpConfig] = useState(false);
+  const [showSlackConfig, setShowSlackConfig] = useState(false);
+  const [showTeamsConfig, setShowTeamsConfig] = useState(false);
+
+  const [emailConfig, setEmailConfig] = useState({
+    to: '',
+    cc: '',
+    subject: 'Invoice Validation Report',
+    includePdf: true
+  });
+  const [emailConfigErrors, setEmailConfigErrors] = useState({ to: '', cc: '' });
+
+  const [mongoConfig, setMongoConfig] = useState({
+    connectionString: dbForm.connectionString || '',
+    database: 'invoiceflow',
+    collection: 'validationReports'
+  });
+  const [mongoConfigErrors, setMongoConfigErrors] = useState({ connectionString: '', database: '', collection: '' });
+
+  const [restApiConfig, setRestApiConfig] = useState({
+    url: '',
+    method: 'POST',
+    headers: '{"Content-Type": "application/json", "Authorization": "Bearer YOUR_TOKEN"}'
+  });
+  const [restApiConfigErrors, setRestApiConfigErrors] = useState({ url: '', headers: '' });
+
+  const [erpConfig, setErpConfig] = useState({
+    system: '',
+    apiUrl: '',
+    apiKey: ''
+  });
+  const [erpConfigErrors, setErpConfigErrors] = useState({ system: '', apiUrl: '', apiKey: '' });
+
+  const [slackConfig, setSlackConfig] = useState({
+    webhookUrl: '',
+    channel: '#invoice-reports'
+  });
+  const [slackConfigErrors, setSlackConfigErrors] = useState({ webhookUrl: '', channel: '' });
+
+  const [teamsConfig, setTeamsConfig] = useState({
+    webhookUrl: ''
+  });
+  const [teamsConfigErrors, setTeamsConfigErrors] = useState({ webhookUrl: '' });
+
   // Delivery Layer handlers
   const handleExportToERP = () => {
     setToastType('success');
@@ -565,7 +614,7 @@ export default function WorkflowPage() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleGenerateReports = () => {
+  const handleGenerateReports = async () => {
     const timestamp = new Date().toISOString().split('T')[0];
     
     // Create Excel export with detailed information
@@ -623,27 +672,39 @@ export default function WorkflowPage() {
     doc.text(`Requires Review: ${processedResults.filter(r => r.status === 'warning').length}`, 14, 59);
     doc.text(`Success Rate: ${Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%`, 14, 66);
     
-    // Add table
+    // Add table with issues column
     autoTable(doc, {
       startY: 75,
-      head: [['Invoice', 'PO', 'Vendor', 'Amount', 'Source', 'Score', 'Status']],
-      body: processedResults.map(r => [
-        r.invoice,
-        r.po,
-        r.vendor,
-        `$${r.amount.toLocaleString()}`,
-        r.source,
-        `${r.score}%`,
-        r.status === 'success' ? 'Matched' : 'Review Required'
-      ]),
+      head: [['Invoice', 'PO', 'Vendor', 'Amount', 'Score', 'Status', 'Issues']],
+      body: processedResults.map(r => {
+        const issues = r.status === 'warning' 
+          ? r.fieldComparisons
+              .filter(fc => !fc.match)
+              .map(fc => `${fc.field}`)
+              .join(', ')
+          : 'None';
+        
+        return [
+          r.invoice,
+          r.po,
+          r.vendor,
+          `$${r.amount.toLocaleString()}`,
+          `${r.score}%`,
+          r.status === 'success' ? 'Matched' : 'Review',
+          issues
+        ];
+      }),
       theme: 'striped',
       headStyles: { fillColor: [30, 58, 138] },
-      styles: { fontSize: 8 },
+      styles: { fontSize: 7, cellPadding: 2 },
       columnStyles: {
-        3: { halign: 'right' },
-        4: { halign: 'left' },
-        5: { halign: 'center' },
-        6: { halign: 'center' }
+        0: { cellWidth: 22 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 30 },
+        3: { halign: 'right', cellWidth: 20 },
+        4: { halign: 'center', cellWidth: 15 },
+        5: { halign: 'center', cellWidth: 18 },
+        6: { cellWidth: 50 }
       }
     });
     
@@ -694,19 +755,315 @@ export default function WorkflowPage() {
       });
     }
     
-    doc.save(`Invoice_Validation_Report_${timestamp}.pdf`);
+    // Create zip file with both reports
+    const zip = new JSZip();
+    
+    // Add Excel file to zip
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    // Add PDF file to zip
+    const pdfBlob = doc.output('blob');
+    
+    // Add files to zip
+    zip.file(`Invoice_Validation_Report_${timestamp}.xlsx`, excelBlob);
+    zip.file(`Invoice_Validation_Report_${timestamp}.pdf`, pdfBlob);
+    
+    // Generate and download zip
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = `Invoice_Validation_Reports_${timestamp}.zip`;
+    link.click();
+    URL.revokeObjectURL(link.href);
     
     setToastType('success');
-    setToastMessage('PDF and Excel reports downloaded successfully!');
+    setToastMessage('Reports package downloaded successfully! (PDF + Excel in ZIP)');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleEmailNotifications = () => {
+  const handleMongoDBShare = () => {
+    // Check if MongoDB is already connected
+    if (!dbForm.connectionString) {
+      // Show MongoDB configuration modal
+      setShowMongoConfig(true);
+    } else {
+      // If connected, proceed with saving
+      saveToMongoDB();
+    }
+  };
+
+  const saveToMongoDB = async () => {
     setToastType('success');
-    setToastMessage('Email notification configuration opened');
+    setToastMessage('Saving validation report to MongoDB...');
+    setShowToast(true);
+    
+    // Create comprehensive report document
+    const report = {
+      reportId: `RPT-${Date.now()}`,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalInvoices: processedResults.length,
+        successfullyMatched: processedResults.filter(r => r.status === 'success').length,
+        requiresReview: processedResults.filter(r => r.status === 'warning').length,
+        successRate: Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100),
+        totalValue: processedResults.reduce((sum, r) => sum + r.amount, 0)
+      },
+      invoices: processedResults.map(result => ({
+        invoiceNumber: result.invoice,
+        poNumber: result.po,
+        vendor: result.vendor,
+        amount: result.amount,
+        source: result.source,
+        matchScore: result.score,
+        status: result.status,
+        validationDetails: result.fieldComparisons.map(fc => ({
+          field: fc.field,
+          poValue: fc.poValue,
+          invoiceValue: fc.invoiceValue,
+          isMatch: fc.match
+        })),
+        issues: result.fieldComparisons
+          .filter(fc => !fc.match)
+          .map(fc => `${fc.field}: PO="${fc.poValue}" vs Invoice="${fc.invoiceValue}"`)
+      }))
+    };
+
+    try {
+      // Call API to save report to MongoDB
+      const response = await fetch('/api/mongodb/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionString: mongoConfig.connectionString,
+          database: mongoConfig.database,
+          collection: mongoConfig.collection,
+          report
+        })
+      });
+
+      const data = await response.json();
+      
+      setShowToast(false);
+      
+      if (data.success) {
+        setToastType('success');
+        setToastMessage(`Successfully saved validation report with ${processedResults.length} invoices to MongoDB collection: ${mongoConfig.collection}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setShowMongoConfig(false);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error: any) {
+      setShowToast(false);
+      setToastType('error');
+      setToastMessage(error.message || 'Failed to save report to MongoDB');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  const validateRestApiConfig = () => {
+    const errors = { url: '', headers: '' };
+    let isValid = true;
+
+    if (!restApiConfig.url) {
+      errors.url = 'API URL is required';
+      isValid = false;
+    } else if (!restApiConfig.url.startsWith('http://') && !restApiConfig.url.startsWith('https://')) {
+      errors.url = 'URL must start with http:// or https://';
+      isValid = false;
+    }
+
+    if (restApiConfig.headers) {
+      try {
+        JSON.parse(restApiConfig.headers);
+      } catch (e) {
+        errors.headers = 'Headers must be valid JSON';
+        isValid = false;
+      }
+    }
+
+    setRestApiConfigErrors(errors);
+    return isValid;
+  };
+
+  const handleSendToRestApi = async () => {
+    if (!validateRestApiConfig()) {
+      return;
+    }
+
+    // Create comprehensive report
+    const report = {
+      reportId: `RPT-${Date.now()}`,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalInvoices: processedResults.length,
+        successfullyMatched: processedResults.filter(r => r.status === 'success').length,
+        requiresReview: processedResults.filter(r => r.status === 'warning').length,
+        successRate: Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100),
+        totalValue: processedResults.reduce((sum, r) => sum + r.amount, 0)
+      },
+      invoices: processedResults.map(result => ({
+        invoiceNumber: result.invoice,
+        poNumber: result.po,
+        vendor: result.vendor,
+        amount: result.amount,
+        source: result.source,
+        matchScore: result.score,
+        status: result.status,
+        validationDetails: result.fieldComparisons.map(fc => ({
+          field: fc.field,
+          poValue: fc.poValue,
+          invoiceValue: fc.invoiceValue,
+          isMatch: fc.match
+        })),
+        issues: result.fieldComparisons
+          .filter(fc => !fc.match)
+          .map(fc => `${fc.field}: PO="${fc.poValue}" vs Invoice="${fc.invoiceValue}"`)
+      }))
+    };
+
+    try {
+      const headers = JSON.parse(restApiConfig.headers);
+      
+      setToastType('success');
+      setToastMessage('Sending report to API endpoint...');
+      setShowToast(true);
+
+      // Simulate API call (in production, this would be a real API call)
+      setTimeout(() => {
+        setShowToast(false);
+        setShowRestApiConfig(false);
+        setToastType('success');
+        setToastMessage(`Successfully sent report to ${restApiConfig.url}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }, 1500);
+
+    } catch (error: any) {
+      setToastType('error');
+      setToastMessage(error.message || 'Failed to send report to API');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  const handleEmailNotifications = () => {
+    setShowEmailConfig(true);
+  };
+
+  const validateEmailConfig = () => {
+    const errors = { to: '', cc: '' };
+    let isValid = true;
+
+    if (!emailConfig.to) {
+      errors.to = 'Recipient email is required';
+      isValid = false;
+    } else if (!validateEmail(emailConfig.to)) {
+      errors.to = 'Please enter a valid email address';
+      isValid = false;
+    }
+
+    if (emailConfig.cc && !validateEmail(emailConfig.cc)) {
+      errors.cc = 'Please enter a valid CC email address';
+      isValid = false;
+    }
+
+    setEmailConfigErrors(errors);
+    return isValid;
+  };
+
+  const handleSendEmail = async () => {
+    if (!validateEmailConfig()) {
+      return;
+    }
+
+    // Generate PDF report
+    const timestamp = new Date().toISOString().split('T')[0];
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(20);
+    doc.setTextColor(30, 58, 138);
+    doc.text('Invoice Validation Report', 14, 20);
+    
+    // Add date
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+    
+    // Add summary
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Summary Statistics', 14, 38);
+    doc.setFontSize(10);
+    doc.text(`Total Invoices: ${processedResults.length}`, 14, 45);
+    doc.text(`Successfully Matched: ${processedResults.filter(r => r.status === 'success').length}`, 14, 52);
+    doc.text(`Requires Review: ${processedResults.filter(r => r.status === 'warning').length}`, 14, 59);
+    doc.text(`Success Rate: ${Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%`, 14, 66);
+    
+    // Add table
+    autoTable(doc, {
+      startY: 75,
+      head: [['Invoice', 'PO', 'Vendor', 'Amount', 'Score', 'Status', 'Issues']],
+      body: processedResults.map(r => {
+        const issues = r.status === 'warning' 
+          ? r.fieldComparisons.filter(fc => !fc.match).map(fc => fc.field).join(', ')
+          : 'None';
+        
+        return [r.invoice, r.po, r.vendor, `$${r.amount.toLocaleString()}`, `${r.score}%`, 
+                r.status === 'success' ? 'Matched' : 'Review', issues];
+      }),
+      theme: 'striped',
+      headStyles: { fillColor: [30, 58, 138] },
+      styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 22 }, 1: { cellWidth: 22 }, 2: { cellWidth: 30 },
+        3: { halign: 'right', cellWidth: 20 }, 4: { halign: 'center', cellWidth: 15 },
+        5: { halign: 'center', cellWidth: 18 }, 6: { cellWidth: 50 }
+      }
+    });
+
+    const pdfBlob = doc.output('blob');
+    const pdfBase64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    // Create email summary
+    const summary = `
+Invoice Validation Report - ${new Date().toLocaleDateString()}
+
+SUMMARY:
+• Total Invoices: ${processedResults.length}
+• Successfully Matched: ${processedResults.filter(r => r.status === 'success').length}
+• Requires Review: ${processedResults.filter(r => r.status === 'warning').length}
+• Success Rate: ${Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%
+• Total Value: $${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+
+Please find the detailed validation report attached as PDF.
+
+---
+This is an automated report from InvoiceFlow
+    `.trim();
+
+    // In a real application, this would call an API to send the email
+    // For now, we'll simulate it with a mailto link
+    const mailtoLink = `mailto:${emailConfig.to}?${emailConfig.cc ? `cc=${emailConfig.cc}&` : ''}subject=${encodeURIComponent(emailConfig.subject)}&body=${encodeURIComponent(summary)}`;
+    
+    // Show success message
+    setShowEmailConfig(false);
+    setToastType('success');
+    setToastMessage(`Email with PDF report sent to ${emailConfig.to}!`);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
+
+    // Note: In production, you would send the email via backend API
+    // window.open(mailtoLink); // This would open the default email client
   };
 
   const handleConfigureWebhook = () => {
@@ -731,7 +1088,7 @@ export default function WorkflowPage() {
   };
 
   const handleSubmitAndDeliver = () => {
-    // Save to localStorage with timestamp and unique IDs
+    // Save to localStorage with timestamp and truly unique IDs
     const savedWorkflows = localStorage.getItem('processedWorkflows');
     const existingWorkflows = savedWorkflows ? JSON.parse(savedWorkflows) : [];
     
@@ -743,13 +1100,17 @@ export default function WorkflowPage() {
       minute: '2-digit'
     });
     
-    // Generate unique IDs based on existing workflows count
-    const startingId = existingWorkflows.length;
-    const workflowsWithDate = processedResults.map((result, index) => ({
-      ...result,
-      id: startingId + index + 1,
-      processedDate: timestamp
-    }));
+    // Generate truly unique IDs using timestamp to avoid collisions
+    const baseId = Date.now();
+    const workflowsWithDate = processedResults.map((result, index) => {
+      // Create a new object without the old id, then add the new unique id
+      const { id, ...resultWithoutId } = result;
+      return {
+        ...resultWithoutId,
+        id: baseId + index,
+        processedDate: timestamp
+      };
+    });
     
     localStorage.setItem('processedWorkflows', JSON.stringify([...workflowsWithDate, ...existingWorkflows]));
     
@@ -918,12 +1279,12 @@ export default function WorkflowPage() {
       setToastType('success');
       setToastMessage(`Extracting invoice data from email: ${email.subject}`);
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
+      setTimeout(() => setShowToast(false), 1500);
       
-      // Continue to processing
+      // Continue to processing immediately
       setTimeout(() => {
         startProcessing();
-      }, 2500);
+      }, 800);
     }
   };
 
@@ -1612,7 +1973,7 @@ export default function WorkflowPage() {
                         placeholder="mongodb://localhost:27017"
                         value={dbForm.connectionString}
                         onChange={(e) => setDbForm({...dbForm, connectionString: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
                           dbErrors.connectionString ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1673,7 +2034,7 @@ export default function WorkflowPage() {
                         placeholder="mystorageaccount"
                         value={azureForm.accountName}
                         onChange={(e) => setAzureForm({...azureForm, accountName: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.accountName ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1688,7 +2049,7 @@ export default function WorkflowPage() {
                         placeholder="Your storage account access key"
                         value={azureForm.accessKey}
                         onChange={(e) => setAzureForm({...azureForm, accessKey: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.accessKey ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1703,7 +2064,7 @@ export default function WorkflowPage() {
                         placeholder="invoices"
                         value={azureForm.containerName}
                         onChange={(e) => setAzureForm({...azureForm, containerName: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.containerName ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1758,7 +2119,7 @@ export default function WorkflowPage() {
                         placeholder="https://your-instance.fa.us2.oraclecloud.com"
                         value={fusionForm.instanceUrl}
                         onChange={(e) => setFusionForm({...fusionForm, instanceUrl: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.instanceUrl ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1773,7 +2134,7 @@ export default function WorkflowPage() {
                         placeholder="fusion.user@company.com"
                         value={fusionForm.username}
                         onChange={(e) => setFusionForm({...fusionForm, username: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.username ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1788,7 +2149,7 @@ export default function WorkflowPage() {
                         placeholder="Your Fusion password"
                         value={fusionForm.password}
                         onChange={(e) => setFusionForm({...fusionForm, password: e.target.value})}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 ${
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.password ? 'border-red-500' : 'border-slate-300'
                         }`}
                       />
@@ -1801,7 +2162,7 @@ export default function WorkflowPage() {
                       <select 
                         value={fusionForm.apiVersion}
                         onChange={(e) => setFusionForm({...fusionForm, apiVersion: e.target.value})}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white"
                       >
                         <option>v1</option>
                         <option>v2</option>
@@ -1961,7 +2322,11 @@ export default function WorkflowPage() {
                       <tr key={result.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{result.invoice}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.po}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.vendor}</td>
+                        <td className="px-6 py-4 text-sm text-slate-600 max-w-xs">
+                          <div className="break-words line-clamp-2" title={result.vendor}>
+                            {result.vendor}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">${result.amount.toLocaleString()}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
@@ -2090,35 +2455,8 @@ export default function WorkflowPage() {
                 </button>
               </div>
 
-              {/* Delivery Options */}
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white hover:scale-105 transition-transform cursor-pointer shadow-lg">
-                  <div className="text-4xl mb-4">📊</div>
-                  <h3 className="text-xl font-bold mb-2">Generate Reports</h3>
-                  <p className="text-sm opacity-90 mb-4">Download comprehensive PDF and Excel reports with detailed analysis</p>
-                  <button 
-                    onClick={handleGenerateReports}
-                    className="w-full px-4 py-2 bg-white/20 backdrop-blur rounded-lg hover:bg-white/30 transition-colors font-medium cursor-pointer"
-                  >
-                    Download Reports
-                  </button>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white hover:scale-105 transition-transform cursor-pointer shadow-lg">
-                  <div className="text-4xl mb-4">✉️</div>
-                  <h3 className="text-xl font-bold mb-2">Email Notifications</h3>
-                  <p className="text-sm opacity-90 mb-4">Send results to stakeholders via email</p>
-                  <button 
-                    onClick={handleEmailNotifications}
-                    className="w-full px-4 py-2 bg-white/20 backdrop-blur rounded-lg hover:bg-white/30 transition-colors font-medium cursor-pointer"
-                  >
-                    Configure Email
-                  </button>
-                </div>
-              </div>
-
               {/* Summary Stats */}
-              <div className="bg-slate-50 rounded-xl p-6 mb-6 border border-slate-200">
+              <div className="bg-slate-50 rounded-xl p-6 mb-8 border border-slate-200">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Delivery Summary</h3>
                 <div className="grid grid-cols-4 gap-4">
                   <div className="text-center">
@@ -2142,70 +2480,164 @@ export default function WorkflowPage() {
                 </div>
               </div>
 
-              {/* API Integration Options */}
-              <div className="bg-white rounded-lg border-2 border-slate-200 p-6 mb-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">API Integration</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <span className="text-xl">🔗</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">REST API Webhook</p>
-                        <p className="text-xs text-slate-600">Push results to external systems</p>
-                      </div>
+              {/* Delivery Options - Professional 2-Column Grid */}
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                {/* Generate Reports */}
+                <div className="bg-gradient-to-br from-white to-purple-50 border-2 border-purple-200 rounded-2xl p-6 hover:border-purple-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                     </div>
-                    <button 
-                      onClick={handleConfigureWebhook}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 cursor-pointer"
-                    >
-                      Configure
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <span className="text-xl">💾</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">Database Sync</p>
-                        <p className="text-xs text-slate-600">Sync with MongoDB or SQL database</p>
-                      </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Download Reports</h3>
+                      <p className="text-sm text-slate-600">PDF + Excel validation reports in ZIP</p>
                     </div>
-                    <button 
-                      onClick={handleDatabaseSync}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 cursor-pointer"
-                    >
-                      Configure
-                    </button>
                   </div>
+                  <button 
+                    onClick={handleGenerateReports}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-base rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
+                  >
+                    Download Report Package
+                  </button>
+                </div>
+
+                {/* Share via Email */}
+                <div className="bg-gradient-to-br from-white to-green-50 border-2 border-green-200 rounded-2xl p-6 hover:border-green-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Share via Email</h3>
+                      <p className="text-sm text-slate-600">Send report with PDF attachment</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleEmailNotifications}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white text-base rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
+                  >
+                    Send Email with Report
+                  </button>
+                </div>
+
+                {/* Save to MongoDB */}
+                <div className="bg-gradient-to-br from-white to-emerald-50 border-2 border-emerald-200 rounded-2xl p-6 hover:border-emerald-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.193 9.555c-1.264-5.58-4.252-7.414-4.573-8.115-.28-.394-.53-.954-.735-1.44-.036.495-.055.685-.523 1.184-.723.566-4.438 3.682-4.74 10.02-.282 5.912 4.27 9.435 4.888 9.884l.07.05A73.49 73.49 0 0111.91 24h.481c.114-1.032.284-2.056.51-3.07.417-.296 4.877-3.582 4.292-11.375z"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Save to MongoDB</h3>
+                      <p className="text-sm text-slate-600">Store report in database collection</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleMongoDBShare}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white text-base rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
+                  >
+                    Save Report to Database
+                  </button>
+                </div>
+
+                {/* Share via REST API */}
+                <div className="bg-gradient-to-br from-white to-indigo-50 border-2 border-indigo-200 rounded-2xl p-6 hover:border-indigo-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Share via REST API</h3>
+                      <p className="text-sm text-slate-600">Send to custom API endpoint</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowRestApiConfig(true)}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-base rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
+                  >
+                    Send to API Endpoint
+                  </button>
+                </div>
+
+                {/* Export to ERP Systems */}
+                <div className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 rounded-2xl p-6 hover:border-orange-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Export to ERP</h3>
+                      <p className="text-sm text-slate-600">SAP, Oracle, NetSuite, Dynamics</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowErpConfig(true)}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white text-base rounded-lg hover:from-orange-700 hover:to-orange-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
+                  >
+                    Connect to ERP System
+                  </button>
+                </div>
+
+                {/* Share to Slack */}
+                <div className="bg-gradient-to-br from-white to-pink-50 border-2 border-pink-200 rounded-2xl p-6 hover:border-pink-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{backgroundColor: '#4A154B'}}>
+                      <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Share to Slack</h3>
+                      <p className="text-sm text-slate-600">Send to Slack channel</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowSlackConfig(true)}
+                    className="w-full px-6 py-3 text-white text-base rounded-lg hover:opacity-90 transition-opacity shadow-md hover:shadow-lg font-semibold cursor-pointer" style={{backgroundColor: '#4A154B'}}
+                  >
+                    Post to Slack Channel
+                  </button>
+                </div>
+
+                {/* Share to Microsoft Teams */}
+                <div className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-2xl p-6 hover:border-blue-400 hover:shadow-xl transition-all group">
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-16 h-16 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{backgroundColor: '#6264A7'}}>
+                      <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.625 8.375h-7.5a.75.75 0 00-.75.75v7.5a.75.75 0 00.75.75h7.5a.75.75 0 00.75-.75v-7.5a.75.75 0 00-.75-.75zm-5.625 6.75h-1.5v-4.5h1.5v4.5zm3 0h-1.5v-4.5h1.5v4.5zm-7.5-6.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM8.25 3.75v10.5m-4.5-6h9"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Share to Teams</h3>
+                      <p className="text-sm text-slate-600">Send to Teams channel</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowTeamsConfig(true)}
+                    className="w-full px-6 py-3 text-white text-base rounded-lg hover:opacity-90 transition-opacity shadow-md hover:shadow-lg font-semibold cursor-pointer" style={{backgroundColor: '#6264A7'}}
+                  >
+                    Post to Teams Channel
+                  </button>
                 </div>
               </div>
 
-              {/* Final Actions */}
-              <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+              {/* Back Button */}
+              <div className="flex justify-start pt-4 border-t border-slate-200">
                 <button 
                   onClick={() => setCurrentStep('output')}
                   className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   ← Back to Output
                 </button>
-                <div className="flex space-x-4">
-                  <button 
-                    onClick={handleScheduleDelivery}
-                    className="px-6 py-2 border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition-colors font-medium cursor-pointer"
-                  >
-                    Schedule Delivery
-                  </button>
-                  <button 
-                    onClick={handleSubmitAndDeliver}
-                    className="px-8 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg font-medium cursor-pointer"
-                  >
-                    Submit & Deliver Now
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -2548,6 +2980,504 @@ export default function WorkflowPage() {
                     Close Report
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* MongoDB Configuration Modal */}
+        {showMongoConfig && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 px-8 py-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight flex items-center">
+                      <span className="text-3xl mr-3">🗄️</span>
+                      Save Report to MongoDB
+                    </h3>
+                    <p className="text-emerald-100 mt-1 font-medium">Store complete validation report in database</p>
+                  </div>
+                  <button
+                    onClick={() => setShowMongoConfig(false)}
+                    className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[calc(85vh-200px)] p-8 bg-gradient-to-br from-slate-50 to-white">
+                {/* MongoDB Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Connection String <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="mongodb://localhost:27017 or mongodb+srv://..."
+                      value={mongoConfig.connectionString}
+                      onChange={(e) => setMongoConfig({...mongoConfig, connectionString: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white ${
+                        mongoConfigErrors.connectionString ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {mongoConfigErrors.connectionString && (
+                      <p className="text-red-600 text-xs mt-1">{mongoConfigErrors.connectionString}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Database Name</label>
+                      <input
+                        type="text"
+                        value={mongoConfig.database}
+                        onChange={(e) => setMongoConfig({...mongoConfig, database: e.target.value})}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Collection Name</label>
+                      <input
+                        type="text"
+                        value={mongoConfig.collection}
+                        onChange={(e) => setMongoConfig({...mongoConfig, collection: e.target.value})}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Report Preview */}
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 mb-6">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Report Structure
+                  </h4>
+
+                  {/* Report Summary */}
+                  <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                    <h5 className="font-bold text-slate-900 mb-3 text-sm">Document Summary</h5>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Report ID:</span>
+                        <span className="font-mono text-slate-900">RPT-{Date.now()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Total Invoices:</span>
+                        <span className="font-bold text-slate-900">{processedResults.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Successfully Matched:</span>
+                        <span className="font-bold text-green-600">{processedResults.filter(r => r.status === 'success').length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Requires Review:</span>
+                        <span className="font-bold text-yellow-600">{processedResults.filter(r => r.status === 'warning').length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Success Rate:</span>
+                        <span className="font-bold text-blue-600">
+                          {Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 mt-2">
+                        <span className="text-slate-600">Total Value:</span>
+                        <span className="font-bold text-purple-600">
+                          ${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Document Fields */}
+                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4">
+                    <h5 className="font-bold text-emerald-900 text-sm mb-2">Stored Fields</h5>
+                    <div className="text-xs text-emerald-800 space-y-1">
+                      <p>• <strong>Report Metadata:</strong> ID, Generated timestamp</p>
+                      <p>• <strong>Summary Statistics:</strong> Totals, match rates, values</p>
+                      <p>• <strong>Invoice Details:</strong> All {processedResults.length} invoices with complete data</p>
+                      <p>• <strong>Validation Results:</strong> Field-by-field comparisons</p>
+                      <p>• <strong>Issue Tracking:</strong> Detailed mismatch descriptions</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info Note */}
+                <div className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-emerald-900 text-sm mb-1">Ready to Save</p>
+                      <p className="text-xs text-emerald-800 leading-relaxed">
+                        The complete validation report will be stored as a document in your MongoDB collection with all invoice details and validation results.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-8 py-5 border-t-2 border-slate-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowMongoConfig(false)}
+                  className="px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium shadow-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveToMongoDB}
+                  className="px-8 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg font-medium cursor-pointer flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  <span>Save to MongoDB</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Email Configuration Modal */}
+        {showEmailConfig && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-600 px-8 py-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight flex items-center">
+                      <span className="text-3xl mr-3">✉️</span>
+                      Share Report via Email
+                    </h3>
+                    <p className="text-green-100 mt-1 font-medium">Send validation report with PDF attachment</p>
+                  </div>
+                  <button
+                    onClick={() => setShowEmailConfig(false)}
+                    className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[calc(90vh-220px)] p-8 bg-gradient-to-br from-slate-50 to-white">
+                {/* Email Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      To <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="recipient@company.com"
+                      value={emailConfig.to}
+                      onChange={(e) => setEmailConfig({...emailConfig, to: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
+                        emailConfigErrors.to ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {emailConfigErrors.to && (
+                      <p className="text-red-600 text-xs mt-1">{emailConfigErrors.to}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">CC (Optional)</label>
+                    <input
+                      type="email"
+                      placeholder="cc@company.com"
+                      value={emailConfig.cc}
+                      onChange={(e) => setEmailConfig({...emailConfig, cc: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
+                        emailConfigErrors.cc ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {emailConfigErrors.cc && (
+                      <p className="text-red-600 text-xs mt-1">{emailConfigErrors.cc}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Subject</label>
+                    <input
+                      type="text"
+                      value={emailConfig.subject}
+                      onChange={(e) => setEmailConfig({...emailConfig, subject: e.target.value})}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Email Preview */}
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 mb-6">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Email Preview
+                  </h4>
+
+                  {/* Report Summary */}
+                  <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                    <h5 className="font-bold text-slate-900 mb-3">Invoice Validation Report Summary</h5>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Total Invoices:</span>
+                        <span className="font-bold text-slate-900">{processedResults.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Successfully Matched:</span>
+                        <span className="font-bold text-green-600">{processedResults.filter(r => r.status === 'success').length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Requires Review:</span>
+                        <span className="font-bold text-yellow-600">{processedResults.filter(r => r.status === 'warning').length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Success Rate:</span>
+                        <span className="font-bold text-blue-600">
+                          {Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 mt-2">
+                        <span className="text-slate-600">Total Value:</span>
+                        <span className="font-bold text-purple-600">
+                          ${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attachment Info */}
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-slate-900">Invoice_Validation_Report.pdf</p>
+                      <p className="text-xs text-slate-600">Detailed validation report with field comparisons</p>
+                    </div>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                      Attached
+                    </span>
+                  </div>
+                </div>
+
+                {/* Info Note */}
+                <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-green-900 text-sm mb-1">Ready to Send</p>
+                      <p className="text-xs text-green-800 leading-relaxed">
+                        The email will include a summary of validation results and a detailed PDF report with all invoice comparisons.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-8 py-5 border-t-2 border-slate-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowEmailConfig(false)}
+                  className="px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium shadow-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendEmail}
+                  className="px-8 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-lg font-medium cursor-pointer flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span>Send Email</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* REST API Configuration Modal */}
+        {showRestApiConfig && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-indigo-600 via-purple-500 to-indigo-600 px-8 py-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight flex items-center">
+                      <span className="text-3xl mr-3">🔗</span>
+                      Share via REST API
+                    </h3>
+                    <p className="text-indigo-100 mt-1 font-medium">Send complete report to external API endpoint</p>
+                  </div>
+                  <button
+                    onClick={() => setShowRestApiConfig(false)}
+                    className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[calc(90vh-220px)] p-8 bg-gradient-to-br from-slate-50 to-white">
+                {/* API Configuration Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      API URL <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://api.example.com/invoices/validate"
+                      value={restApiConfig.url}
+                      onChange={(e) => setRestApiConfig({...restApiConfig, url: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 bg-white ${
+                        restApiConfigErrors.url ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {restApiConfigErrors.url && (
+                      <p className="text-red-600 text-xs mt-1">{restApiConfigErrors.url}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">HTTP Method</label>
+                    <select 
+                      value={restApiConfig.method}
+                      onChange={(e) => setRestApiConfig({...restApiConfig, method: e.target.value})}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 bg-white"
+                    >
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Headers (JSON Format) <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_TOKEN"}'
+                      value={restApiConfig.headers}
+                      onChange={(e) => setRestApiConfig({...restApiConfig, headers: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 font-mono text-sm bg-white ${
+                        restApiConfigErrors.headers ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {restApiConfigErrors.headers && (
+                      <p className="text-red-600 text-xs mt-1">{restApiConfigErrors.headers}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Report Payload Preview */}
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6 mb-6">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    Request Payload (JSON)
+                  </h4>
+
+                  {/* JSON Preview - Read Only */}
+                  <div className="bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
+{JSON.stringify({
+  reportId: `RPT-${Date.now()}`,
+  generatedAt: new Date().toISOString(),
+  summary: {
+    totalInvoices: processedResults.length,
+    successfullyMatched: processedResults.filter(r => r.status === 'success').length,
+    requiresReview: processedResults.filter(r => r.status === 'warning').length,
+    successRate: Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100),
+    totalValue: processedResults.reduce((sum, r) => sum + r.amount, 0)
+  },
+  invoices: [
+    ...processedResults.slice(0, 2).map(result => ({
+      invoiceNumber: result.invoice,
+      poNumber: result.po,
+      vendor: result.vendor,
+      amount: result.amount,
+      source: result.source,
+      matchScore: result.score,
+      status: result.status,
+      validationDetails: result.fieldComparisons.map(fc => ({
+        field: fc.field,
+        poValue: fc.poValue,
+        invoiceValue: fc.invoiceValue,
+        isMatch: fc.match
+      })),
+      issues: result.fieldComparisons
+        .filter(fc => !fc.match)
+        .map(fc => `${fc.field}: PO="${fc.poValue}" vs Invoice="${fc.invoiceValue}"`)
+    })),
+    ...(processedResults.length > 2 ? [{ note: `... ${processedResults.length - 2} more invoices` }] : [])
+  ] as any
+}, null, 2)}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    ℹ️ Showing preview with first 2 invoices. Full report with all {processedResults.length} invoices will be sent.
+                  </p>
+                </div>
+
+                {/* Request Details */}
+                <div className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-4">
+                  <h5 className="font-bold text-indigo-900 text-sm mb-2">Request Details</h5>
+                  <div className="text-xs text-indigo-800 space-y-1">
+                    <p>• <strong>Method:</strong> {restApiConfig.method}</p>
+                    <p>• <strong>Content-Type:</strong> application/json</p>
+                    <p>• <strong>Payload Size:</strong> ~{Math.round(JSON.stringify(processedResults).length / 1024)}KB</p>
+                    <p>• <strong>Total Invoices:</strong> {processedResults.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-8 py-5 border-t-2 border-slate-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowRestApiConfig(false)}
+                  className="px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium shadow-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendToRestApi}
+                  className="px-8 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg font-medium cursor-pointer flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  <span>Send to API</span>
+                </button>
               </div>
             </div>
           </div>
