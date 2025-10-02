@@ -16,6 +16,7 @@ export default function ResultsPage() {
     avgProcessingTime: '2.3s',
     successRate: 80
   };
+  
 
   const insights = [
     {
