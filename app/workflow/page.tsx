@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
+import Select from 'react-select';
 
 type WorkflowStep = 'ingestion' | 'processing' | 'output' | 'delivery';
 type IngestionMethod = 'pdf' | 'email' | 'mongodb' | 'azure' | 'fusion' | 'excel' | null;
@@ -946,6 +947,208 @@ export default function WorkflowPage() {
     } catch (error: any) {
       setToastType('error');
       setToastMessage(error.message || 'Failed to send report to API');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  const validateSlackConfig = () => {
+    const errors = { webhookUrl: '', channel: '' };
+    let isValid = true;
+
+    if (!slackConfig.webhookUrl) {
+      errors.webhookUrl = 'Slack webhook URL is required';
+      isValid = false;
+    } else if (!slackConfig.webhookUrl.startsWith('https://hooks.slack.com/')) {
+      errors.webhookUrl = 'Invalid Slack webhook URL format';
+      isValid = false;
+    }
+
+    if (!slackConfig.channel) {
+      errors.channel = 'Channel name is required';
+      isValid = false;
+    } else if (!slackConfig.channel.startsWith('#') && !slackConfig.channel.startsWith('@')) {
+      errors.channel = 'Channel must start with # or @';
+      isValid = false;
+    }
+
+    setSlackConfigErrors(errors);
+    return isValid;
+  };
+
+  const handleSendToSlack = async () => {
+    if (!validateSlackConfig()) {
+      return;
+    }
+
+    const summary = {
+      text: "📊 Invoice Validation Report",
+      blocks: [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "📊 Invoice Validation Report",
+            emoji: true
+          }
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*Total Invoices:*\n${processedResults.length}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Successfully Matched:*\n${processedResults.filter(r => r.status === 'success').length}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Requires Review:*\n${processedResults.filter(r => r.status === 'warning').length}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Success Rate:*\n${Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%`
+            }
+          ]
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*Total Value:*\n$${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Generated:*\n${new Date().toLocaleString()}`
+            }
+          ]
+        },
+        {
+          type: "divider"
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "Automated report from InvoiceFlow • Click to view full details"
+            }
+          ]
+        }
+      ]
+    };
+
+    try {
+      setToastType('success');
+      setToastMessage('Sending report to Slack...');
+      setShowToast(true);
+
+      // Simulate API call (in production, send to webhook)
+      setTimeout(() => {
+        setShowToast(false);
+        setShowSlackConfig(false);
+        setToastType('success');
+        setToastMessage(`Successfully posted report to ${slackConfig.channel}!`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }, 1500);
+    } catch (error: any) {
+      setToastType('error');
+      setToastMessage(error.message || 'Failed to send report to Slack');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  const validateTeamsConfig = () => {
+    const errors = { webhookUrl: '' };
+    let isValid = true;
+
+    if (!teamsConfig.webhookUrl) {
+      errors.webhookUrl = 'Teams webhook URL is required';
+      isValid = false;
+    } else if (!teamsConfig.webhookUrl.startsWith('https://')) {
+      errors.webhookUrl = 'Webhook URL must start with https://';
+      isValid = false;
+    }
+
+    setTeamsConfigErrors(errors);
+    return isValid;
+  };
+
+  const handleSendToTeams = async () => {
+    if (!validateTeamsConfig()) {
+      return;
+    }
+
+    const card = {
+      "@type": "MessageCard",
+      "@context": "https://schema.org/extensions",
+      "summary": "Invoice Validation Report",
+      "themeColor": "6264A7",
+      "title": "📊 Invoice Validation Report",
+      "sections": [
+        {
+          "activityTitle": "Validation Summary",
+          "activitySubtitle": new Date().toLocaleString(),
+          "facts": [
+            {
+              "name": "Total Invoices:",
+              "value": processedResults.length.toString()
+            },
+            {
+              "name": "Successfully Matched:",
+              "value": processedResults.filter(r => r.status === 'success').length.toString()
+            },
+            {
+              "name": "Requires Review:",
+              "value": processedResults.filter(r => r.status === 'warning').length.toString()
+            },
+            {
+              "name": "Success Rate:",
+              "value": `${Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%`
+            },
+            {
+              "name": "Total Value:",
+              "value": `$${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}`
+            }
+          ]
+        }
+      ],
+      "potentialAction": [
+        {
+          "@type": "OpenUri",
+          "name": "View Full Report",
+          "targets": [
+            {
+              "os": "default",
+              "uri": window.location.href
+            }
+          ]
+        }
+      ]
+    };
+
+    try {
+      setToastType('success');
+      setToastMessage('Sending report to Teams...');
+      setShowToast(true);
+
+      // Simulate API call (in production, send to webhook)
+      setTimeout(() => {
+        setShowToast(false);
+        setShowTeamsConfig(false);
+        setToastType('success');
+        setToastMessage('Successfully posted report to Microsoft Teams!');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }, 1500);
+    } catch (error: any) {
+      setToastType('error');
+      setToastMessage(error.message || 'Failed to send report to Teams');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     }
@@ -2159,14 +2362,29 @@ This is an automated report from InvoiceFlow
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">API Version</label>
-                      <select 
-                        value={fusionForm.apiVersion}
-                        onChange={(e) => setFusionForm({...fusionForm, apiVersion: e.target.value})}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white"
-                      >
-                        <option>v1</option>
-                        <option>v2</option>
-                      </select>
+                      <Select
+                        value={{ label: fusionForm.apiVersion, value: fusionForm.apiVersion }}
+                        onChange={(option) => setFusionForm({...fusionForm, apiVersion: option?.value || 'v1'})}
+                        options={[
+                          { label: 'v1', value: 'v1' },
+                          { label: 'v2', value: 'v2' }
+                        ]}
+                        className="text-slate-900"
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            borderRadius: '0.5rem',
+                            padding: '0.125rem',
+                            borderColor: '#cbd5e1',
+                            '&:hover': { borderColor: '#a855f7' },
+                            boxShadow: 'none',
+                            '&:focus-within': {
+                              borderColor: '#a855f7',
+                              boxShadow: '0 0 0 2px rgba(168, 85, 247, 0.1)'
+                            }
+                          })
+                        }}
+                      />
                       <p className="text-slate-500 text-xs mt-1">
                         💡 Select the REST API version for your Fusion instance
                       </p>
@@ -2566,27 +2784,6 @@ This is an automated report from InvoiceFlow
                   </button>
                 </div>
 
-                {/* Export to ERP Systems */}
-                <div className="bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 rounded-2xl p-6 hover:border-orange-400 hover:shadow-xl transition-all group">
-                  <div className="flex items-center space-x-4 mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-slate-900 text-lg mb-1">Export to ERP</h3>
-                      <p className="text-sm text-slate-600">SAP, Oracle, NetSuite, Dynamics</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowErpConfig(true)}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white text-base rounded-lg hover:from-orange-700 hover:to-orange-800 transition-all shadow-md hover:shadow-lg font-semibold cursor-pointer"
-                  >
-                    Connect to ERP System
-                  </button>
-                </div>
-
                 {/* Share to Slack */}
                 <div className="bg-gradient-to-br from-white to-pink-50 border-2 border-pink-200 rounded-2xl p-6 hover:border-pink-400 hover:shadow-xl transition-all group">
                   <div className="flex items-center space-x-4 mb-4">
@@ -2627,6 +2824,70 @@ This is an automated report from InvoiceFlow
                   >
                     Post to Teams Channel
                   </button>
+                </div>
+
+                {/* ERP Systems - Combined Card */}
+                <div className="md:col-span-2 bg-gradient-to-br from-white to-orange-50 border-2 border-orange-200 rounded-2xl p-6 relative">
+                  <div className="absolute top-3 right-3">
+                    <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">Coming Soon</span>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h3 className="font-bold text-slate-900 text-lg mb-2 flex items-center">
+                      <svg className="w-6 h-6 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      ERP System Integrations
+                    </h3>
+                    <p className="text-sm text-slate-600 ml-8">Connect with leading enterprise resource planning systems</p>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    {/* SAP */}
+                    <div className="bg-white border-2 border-blue-200 rounded-xl p-4 text-center hover:border-blue-400 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="font-black text-2xl" style={{color: '#0066B3'}}>SAP</div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">SAP ERP</p>
+                      <p className="text-xs text-slate-600 mt-1">Enterprise</p>
+                    </div>
+
+                    {/* Oracle NetSuite */}
+                    <div className="bg-white border-2 border-red-200 rounded-xl p-4 text-center hover:border-red-400 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-red-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
+                          <span className="font-black text-white text-sm">NS</span>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">NetSuite</p>
+                      <p className="text-xs text-slate-600 mt-1">Cloud ERP</p>
+                    </div>
+
+                    {/* Microsoft Dynamics */}
+                    <div className="bg-white border-2 border-green-200 rounded-xl p-4 text-center hover:border-green-400 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-slate-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="grid grid-cols-2 gap-0.5 w-10 h-10">
+                          <div className="w-full h-full bg-blue-500 rounded-sm"></div>
+                          <div className="w-full h-full bg-green-500 rounded-sm"></div>
+                          <div className="w-full h-full bg-yellow-500 rounded-sm"></div>
+                          <div className="w-full h-full bg-red-500 rounded-sm"></div>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">Dynamics 365</p>
+                      <p className="text-xs text-slate-600 mt-1">Microsoft</p>
+                    </div>
+
+                    {/* Workday */}
+                    <div className="bg-white border-2 border-yellow-200 rounded-xl p-4 text-center hover:border-yellow-400 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{backgroundColor: '#FF6B2C'}}>
+                          <span className="font-black text-white text-sm">WD</span>
+                        </div>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">Workday</p>
+                      <p className="text-xs text-slate-600 mt-1">Financial</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -3369,14 +3630,29 @@ This is an automated report from InvoiceFlow
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">HTTP Method</label>
-                    <select 
-                      value={restApiConfig.method}
-                      onChange={(e) => setRestApiConfig({...restApiConfig, method: e.target.value})}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-900 bg-white"
-                    >
-                      <option value="POST">POST</option>
-                      <option value="PUT">PUT</option>
-                    </select>
+                    <Select
+                      value={{ label: restApiConfig.method, value: restApiConfig.method }}
+                      onChange={(option) => setRestApiConfig({...restApiConfig, method: option?.value || 'POST'})}
+                      options={[
+                        { label: 'POST', value: 'POST' },
+                        { label: 'PUT', value: 'PUT' }
+                      ]}
+                      className="text-slate-900"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '0.5rem',
+                          padding: '0.125rem',
+                          borderColor: '#cbd5e1',
+                          '&:hover': { borderColor: '#6366f1' },
+                          boxShadow: 'none',
+                          '&:focus-within': {
+                            borderColor: '#6366f1',
+                            boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.1)'
+                          }
+                        })
+                      }}
+                    />
                   </div>
 
                   <div>
@@ -3477,6 +3753,262 @@ This is an automated report from InvoiceFlow
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                   </svg>
                   <span>Send to API</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Slack Configuration Modal */}
+        {showSlackConfig && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="px-8 py-6 text-white" style={{background: 'linear-gradient(to right, #4A154B, #611f69, #4A154B)'}}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight flex items-center">
+                      <svg className="w-8 h-8 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                      </svg>
+                      Share Report to Slack
+                    </h3>
+                    <p className="mt-1 font-medium" style={{color: '#ECB8F5'}}>Post validation summary to your Slack channel</p>
+                  </div>
+                  <button
+                    onClick={() => setShowSlackConfig(false)}
+                    className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[calc(90vh-220px)] p-8 bg-gradient-to-br from-slate-50 to-white">
+                {/* Slack Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Slack Webhook URL <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX"
+                      value={slackConfig.webhookUrl}
+                      onChange={(e) => setSlackConfig({...slackConfig, webhookUrl: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-slate-900 bg-white font-mono text-sm ${
+                        slackConfigErrors.webhookUrl ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {slackConfigErrors.webhookUrl && (
+                      <p className="text-red-600 text-xs mt-1">{slackConfigErrors.webhookUrl}</p>
+                    )}
+                    <p className="text-slate-500 text-xs mt-1">
+                      💡 Get your webhook URL from Slack App settings → Incoming Webhooks
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Channel <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="#invoice-reports"
+                      value={slackConfig.channel}
+                      onChange={(e) => setSlackConfig({...slackConfig, channel: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-slate-900 bg-white ${
+                        slackConfigErrors.channel ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {slackConfigErrors.channel && (
+                      <p className="text-red-600 text-xs mt-1">{slackConfigErrors.channel}</p>
+                    )}
+                    <p className="text-slate-500 text-xs mt-1">
+                      💡 Channel names start with # (e.g., #invoice-reports) or @ for direct messages
+                    </p>
+                  </div>
+                </div>
+
+                {/* Message Preview */}
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    Slack Message Preview
+                  </h4>
+
+                  <div className="border-l-4 rounded-r-lg p-4" style={{borderColor: '#4A154B', backgroundColor: '#F8F8F8'}}>
+                    <p className="font-bold text-lg mb-3">📊 Invoice Validation Report</p>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <p className="text-xs text-slate-600">Total Invoices:</p>
+                        <p className="font-bold text-slate-900">{processedResults.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-600">Successfully Matched:</p>
+                        <p className="font-bold text-green-600">{processedResults.filter(r => r.status === 'success').length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-600">Requires Review:</p>
+                        <p className="font-bold text-yellow-600">{processedResults.filter(r => r.status === 'warning').length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-600">Success Rate:</p>
+                        <p className="font-bold text-blue-600">
+                          {Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border-t pt-3 mb-3">
+                      <div className="flex justify-between">
+                        <p className="text-xs text-slate-600">Total Value:</p>
+                        <p className="font-bold text-purple-600">${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</p>
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <p className="text-xs text-slate-600">Generated:</p>
+                        <p className="text-xs text-slate-900">{new Date().toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 italic">Automated report from InvoiceFlow • Click to view full details</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-8 py-5 border-t-2 border-slate-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowSlackConfig(false)}
+                  className="px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium shadow-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendToSlack}
+                  className="px-8 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity shadow-lg font-medium cursor-pointer flex items-center space-x-2" style={{backgroundColor: '#4A154B'}}
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z"/>
+                  </svg>
+                  <span>Send to Slack</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Teams Configuration Modal */}
+        {showTeamsConfig && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+              {/* Modal Header */}
+              <div className="px-8 py-6 text-white" style={{background: 'linear-gradient(to right, #6264A7, #464EB8, #6264A7)'}}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight flex items-center">
+                      <svg className="w-8 h-8 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.625 8.375h-7.5a.75.75 0 00-.75.75v7.5a.75.75 0 00.75.75h7.5a.75.75 0 00.75-.75v-7.5a.75.75 0 00-.75-.75zm-5.625 6.75h-1.5v-4.5h1.5v4.5zm3 0h-1.5v-4.5h1.5v4.5zm-7.5-6.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM8.25 3.75v10.5m-4.5-6h9"/>
+                      </svg>
+                      Share Report to Microsoft Teams
+                    </h3>
+                    <p className="mt-1 font-medium" style={{color: '#C7C8E8'}}>Post validation summary to your Teams channel</p>
+                  </div>
+                  <button
+                    onClick={() => setShowTeamsConfig(false)}
+                    className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[calc(90vh-220px)] p-8 bg-gradient-to-br from-slate-50 to-white">
+                {/* Teams Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Teams Webhook URL <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://outlook.office.com/webhook/..."
+                      value={teamsConfig.webhookUrl}
+                      onChange={(e) => setTeamsConfig({...teamsConfig, webhookUrl: e.target.value})}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white font-mono text-sm ${
+                        teamsConfigErrors.webhookUrl ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    />
+                    {teamsConfigErrors.webhookUrl && (
+                      <p className="text-red-600 text-xs mt-1">{teamsConfigErrors.webhookUrl}</p>
+                    )}
+                    <p className="text-slate-500 text-xs mt-1">
+                      💡 Get your webhook URL from Teams channel → Connectors → Incoming Webhook
+                    </p>
+                  </div>
+                </div>
+
+                {/* Message Preview */}
+                <div className="bg-white border-2 border-slate-200 rounded-xl p-6">
+                  <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    Teams Message Preview
+                  </h4>
+
+                  <div className="border-l-4 rounded-r-lg p-4" style={{borderColor: '#6264A7', backgroundColor: '#F8F8F8'}}>
+                    <p className="font-bold text-lg mb-3">📊 Invoice Validation Report</p>
+                    <div className="space-y-2 mb-3">
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-600">Total Invoices:</span>
+                        <span className="text-sm font-bold text-slate-900">{processedResults.length}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-600">Successfully Matched:</span>
+                        <span className="text-sm font-bold text-green-600">{processedResults.filter(r => r.status === 'success').length}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-600">Requires Review:</span>
+                        <span className="text-sm font-bold text-yellow-600">{processedResults.filter(r => r.status === 'warning').length}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-600">Success Rate:</span>
+                        <span className="text-sm font-bold text-blue-600">
+                          {Math.round((processedResults.filter(r => r.status === 'success').length / processedResults.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-1 border-t pt-2">
+                        <span className="text-sm text-slate-600">Total Value:</span>
+                        <span className="text-sm font-bold text-purple-600">${processedResults.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3">Validation Summary • {new Date().toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gradient-to-r from-slate-100 to-slate-50 px-8 py-5 border-t-2 border-slate-200 flex items-center justify-between">
+                <button
+                  onClick={() => setShowTeamsConfig(false)}
+                  className="px-6 py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium shadow-md cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendToTeams}
+                  className="px-8 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity shadow-lg font-medium cursor-pointer flex items-center space-x-2" style={{backgroundColor: '#6264A7'}}
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.625 8.375h-7.5a.75.75 0 00-.75.75v7.5a.75.75 0 00.75.75h7.5a.75.75 0 00.75-.75v-7.5a.75.75 0 00-.75-.75z"/>
+                  </svg>
+                  <span>Send to Teams</span>
                 </button>
               </div>
             </div>

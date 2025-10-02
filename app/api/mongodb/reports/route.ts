@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
       insertedId: result.insertedId
     });
 
-  } catch (error: unknown) {
+  } catch (error) {
     console.error('Error saving report to MongoDB:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to save report';
+    const message = error instanceof Error ? error.message : 'Failed to save report';
     return NextResponse.json(
-      { success: false, message: errorMessage },
+      { success: false, message },
       { status: 500 }
     );
   }
