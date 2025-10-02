@@ -84,7 +84,7 @@ export default function LoginPage() {
     
     setTimeout(() => {
       setLoading(false);
-      router.push('/ingestion');
+      router.push('/dashboard');
     }, 1000);
   };
 

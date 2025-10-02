@@ -26,18 +26,20 @@ export async function POST(request: Request) {
       success: true, 
       message: 'Successfully connected to MongoDB' 
     });
-  } catch (error: any) {
+  } catch (error) {
     let errorMessage = 'Failed to connect to MongoDB';
     
     // Provide more specific error messages
-    if (error.message?.includes('ECONNREFUSED')) {
-      errorMessage = 'Connection refused. Is MongoDB running?';
-    } else if (error.message?.includes('authentication failed')) {
-      errorMessage = 'Authentication failed. Check your credentials.';
-    } else if (error.message?.includes('timed out')) {
-      errorMessage = 'Connection timed out. Check your connection string and network.';
-    } else if (error.message) {
-      errorMessage = error.message;
+    if (error instanceof Error) {
+      if (error.message?.includes('ECONNREFUSED')) {
+        errorMessage = 'Connection refused. Is MongoDB running?';
+      } else if (error.message?.includes('authentication failed')) {
+        errorMessage = 'Authentication failed. Check your credentials.';
+      } else if (error.message?.includes('timed out')) {
+        errorMessage = 'Connection timed out. Check your connection string and network.';
+      } else {
+        errorMessage = error.message;
+      }
     }
     
     return NextResponse.json(
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
     if (client) {
       try {
         await client.close();
-      } catch (e) {
+      } catch {
         // Ignore close errors
       }
     }

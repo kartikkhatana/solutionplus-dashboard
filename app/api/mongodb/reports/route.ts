@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { MongoClient } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect to MongoDB
-    const { MongoClient } = require('mongodb');
     const client = new MongoClient(connectionString);
     
     await client.connect();
@@ -32,10 +31,11 @@ export async function POST(request: NextRequest) {
       insertedId: result.insertedId
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error saving report to MongoDB:', error);
+    const message = error instanceof Error ? error.message : 'Failed to save report';
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to save report' },
+      { success: false, message },
       { status: 500 }
     );
   }

@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
 
   // Custom styles for react-select to match theme
   const customSelectStyles = {
-    control: (base: any, state: any) => ({
+    control: (base: Record<string, unknown>, state: { isFocused: boolean }) => ({
       ...base,
       minHeight: '44px',
       borderRadius: '0.75rem',
@@ -104,17 +104,17 @@ export default function AnalyticsPage() {
       backgroundColor: 'white',
       transition: 'all 0.2s'
     }),
-    valueContainer: (base: any) => ({
+    valueContainer: (base: Record<string, unknown>) => ({
       ...base,
       padding: '0 1rem',
       fontWeight: '500',
       fontSize: '0.875rem'
     }),
-    singleValue: (base: any) => ({
+    singleValue: (base: Record<string, unknown>) => ({
       ...base,
       color: '#0f172a'
     }),
-    menu: (base: any) => ({
+    menu: (base: Record<string, unknown>) => ({
       ...base,
       borderRadius: '0.75rem',
       marginTop: '0.25rem',
@@ -122,12 +122,12 @@ export default function AnalyticsPage() {
       border: '1px solid #e2e8f0',
       overflow: 'hidden'
     }),
-    menuList: (base: any) => ({
+    menuList: (base: Record<string, unknown>) => ({
       ...base,
       padding: '0.25rem',
       borderRadius: '0.75rem'
     }),
-    option: (base: any, state: any) => ({
+    option: (base: Record<string, unknown>, state: { isSelected: boolean; isFocused: boolean }) => ({
       ...base,
       backgroundColor: state.isSelected ? '#0f172a' : state.isFocused ? '#f1f5f9' : 'white',
       color: state.isSelected ? 'white' : '#0f172a',
@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
     indicatorSeparator: () => ({
       display: 'none'
     }),
-    dropdownIndicator: (base: any) => ({
+    dropdownIndicator: (base: Record<string, unknown>) => ({
       ...base,
       color: '#64748b',
       '&:hover': {

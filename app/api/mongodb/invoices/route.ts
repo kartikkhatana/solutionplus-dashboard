@@ -319,9 +319,10 @@ export async function GET() {
         purchaseOrders
       }
     });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch data from MongoDB';
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to fetch data from MongoDB' },
+      { success: false, message },
       { status: 500 }
     );
   }
