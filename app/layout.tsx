@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} antialiased`}
-        style={{ fontFamily: 'var(--font-roboto), sans-serif' }}
+      // style={{ fontFamily: 'var(--font-roboto), sans-serif' }}
       >
         {children}
       </body>
