@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   workflowCount?: number;
@@ -10,6 +11,7 @@ interface SidebarProps {
 export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
+  const { logout, userEmail } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
@@ -79,36 +81,35 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
       path: '/purchase-orders',
       badge: '24'
     },
-    {
-      id: 'reports',
-      name: 'Reports',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-      path: '/reports',
-      badge: null
-    },
-    {
-      id: 'settings',
-      name: 'Settings',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      path: '/settings',
-      badge: null
-    }
+    // {
+    //   id: 'reports',
+    //   name: 'Reports',
+    //   icon: (
+    //     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    //     </svg>
+    //   ),
+    //   path: '/reports',
+    //   badge: null
+    // },
+    // {
+    //   id: 'settings',
+    //   name: 'Settings',
+    //   icon: (
+    //     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    //     </svg>
+    //   ),
+    //   path: '/settings',
+    //   badge: null
+    // }
   ];
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full text-white transition-all duration-300 z-50 ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
+      className={`fixed left-0 top-0 h-full text-white transition-all duration-300 z-50 ${isCollapsed ? 'w-20' : 'w-64'
+        }`}
       style={{ background: 'linear-gradient(180deg, #0A0E27 0%, #060920 50%, #0A0E27 100%)' }}
     >
       {/* Logo Section */}
@@ -120,8 +121,12 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <span className="font-bold text-lg">InvoiceFlow</span>
+            <span className="font-bold text-lg">Solutions+ </span>
+            <p>Workflow</p>
           </div>
+          // <div className="flex items-center w-40 h-10">
+          //   <img src="/assets/Solutions-Logo.png" alt="Solutions+" />
+          // </div>
         )}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -145,10 +150,10 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
         <div className="p-4 border-b" style={{ borderColor: 'rgba(107, 70, 193, 0.3)' }}>
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold gradient-primary">
-              JD
+              {userEmail ? userEmail.substring(0, 2).toUpperCase() : 'JD'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">John Doe</p>
+              <p className="text-sm font-medium truncate">{userEmail || 'John Doe'}</p>
               <p className="text-xs truncate" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Finance Manager</p>
             </div>
           </div>
@@ -164,11 +169,10 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
               <button
                 key={item.id}
                 onClick={() => router.push(item.path)}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all group cursor-pointer ${
-                  isActive
-                    ? 'text-white shadow-lg gradient-primary'
-                    : 'text-white'
-                }`}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all group cursor-pointer ${isActive
+                  ? 'text-white shadow-lg gradient-primary'
+                  : 'text-white'
+                  }`}
                 onMouseEnter={!isActive ? (e) => e.currentTarget.style.backgroundColor = 'rgba(107, 70, 193, 0.2)' : undefined}
                 onMouseLeave={!isActive ? (e) => e.currentTarget.style.backgroundColor = 'transparent' : undefined}
               >
@@ -195,7 +199,7 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
       <div className="p-4 border-t" style={{ borderColor: 'rgba(107, 70, 193, 0.3)' }}>
         {!isCollapsed ? (
           <button
-            onClick={() => router.push('/login')}
+            onClick={logout}
             className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-white transition-all"
             style={{ opacity: 0.8 }}
             onMouseEnter={(e) => {
@@ -214,7 +218,7 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
           </button>
         ) : (
           <button
-            onClick={() => router.push('/login')}
+            onClick={logout}
             className="w-full flex justify-center p-2.5 rounded-lg text-white transition-all"
             style={{ opacity: 0.8 }}
             onMouseEnter={(e) => {

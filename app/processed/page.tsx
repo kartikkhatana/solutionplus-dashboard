@@ -80,7 +80,7 @@ export default function ProcessedPage() {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
       <Sidebar workflowCount={processedResults.length} />
-      
+
       <main className="flex-1 ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
@@ -142,19 +142,19 @@ export default function ProcessedPage() {
             </div>
 
             {/* Results Table */}
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-slate-200 rounded-lg overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Invoice</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">PO</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vendor</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Score</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Invoice</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">PO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Vendor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Score</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
@@ -162,7 +162,9 @@ export default function ProcessedPage() {
                     <tr key={result.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{result.invoice}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.po}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.vendor}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 max-w-[150px] overflow-hidden text-ellipsis truncate">
+                        {result.vendor}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">${result.amount.toLocaleString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
@@ -176,11 +178,10 @@ export default function ProcessedPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          result.status === 'success' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${result.status === 'success'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                          }`}>
                           {result.status === 'success' ? 'Matched' : 'Review Required'}
                         </span>
                       </td>
@@ -229,11 +230,10 @@ export default function ProcessedPage() {
                               <button
                                 key={pageNum}
                                 onClick={() => goToPage(pageNum)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                                  currentPage === pageNum
-                                    ? 'bg-blue-600 text-white'
-                                    : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
-                                }`}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${currentPage === pageNum
+                                  ? 'bg-blue-600 text-white'
+                                  : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
+                                  }`}
                               >
                                 {pageNum}
                               </button>
@@ -283,14 +283,13 @@ export default function ProcessedPage() {
                     </svg>
                   </button>
                 </div>
-                
+
                 <div className="mt-5 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className={`px-6 py-2 rounded-xl font-bold text-base shadow-lg ${
-                      selectedResult.status === 'success' 
-                        ? 'bg-emerald-500 text-white' 
-                        : 'bg-amber-500 text-white'
-                    }`}>
+                    <div className={`px-6 py-2 rounded-xl font-bold text-base shadow-lg ${selectedResult.status === 'success'
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-amber-500 text-white'
+                      }`}>
                       Match Score: {selectedResult.score}%
                     </div>
                     <div className="bg-slate-600 px-4 py-2 rounded-xl text-sm font-medium">
@@ -307,25 +306,23 @@ export default function ProcessedPage() {
               <div className="overflow-y-auto max-h-[calc(90vh-280px)] p-8 bg-gradient-to-br from-slate-50 to-white">
                 <div className="space-y-4">
                   {selectedResult.fieldComparisons.map((comparison, idx) => (
-                    <div 
+                    <div
                       key={idx}
-                      className={`rounded-2xl p-6 transition-all shadow-md hover:shadow-lg ${
-                        comparison.match 
-                          ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200' 
-                          : 'bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-200'
-                      }`}
+                      className={`rounded-2xl p-6 transition-all shadow-md hover:shadow-lg ${comparison.match
+                        ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200'
+                        : 'bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-200'
+                        }`}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-bold text-slate-900 text-base">{comparison.field}</h4>
-                        <div className={`px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm ${
-                          comparison.match 
-                            ? 'bg-emerald-500 text-white' 
-                            : 'bg-red-500 text-white'
-                        }`}>
+                        <div className={`px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm ${comparison.match
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-red-500 text-white'
+                          }`}>
                           {comparison.match ? '✓ VALIDATED' : '✗ MISMATCH'}
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-5">
                         <div className="bg-white rounded-xl p-5 border-2 border-slate-200 shadow-sm">
                           <p className="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center tracking-wide">
@@ -334,9 +331,8 @@ export default function ProcessedPage() {
                             </svg>
                             Purchase Order
                           </p>
-                          <p className={`text-base font-bold ${
-                            comparison.match ? 'text-emerald-700' : 'text-red-700'
-                          }`}>
+                          <p className={`text-base font-bold ${comparison.match ? 'text-emerald-700' : 'text-red-700'
+                            }`}>
                             {comparison.poValue}
                           </p>
                         </div>
@@ -348,9 +344,8 @@ export default function ProcessedPage() {
                             </svg>
                             Invoice
                           </p>
-                          <p className={`text-base font-bold ${
-                            comparison.match ? 'text-emerald-700' : 'text-red-700'
-                          }`}>
+                          <p className={`text-base font-bold ${comparison.match ? 'text-emerald-700' : 'text-red-700'
+                            }`}>
                             {comparison.invoiceValue}
                           </p>
                         </div>
@@ -380,17 +375,16 @@ export default function ProcessedPage() {
                     </span>
                     <span className="text-slate-600 ml-1">/ {selectedResult.fieldComparisons.length} fields validated</span>
                   </div>
-                  <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${
-                    selectedResult.status === 'success'
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                      : 'bg-amber-100 text-amber-700 border border-amber-300'
-                  }`}>
+                  <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${selectedResult.status === 'success'
+                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-700 border border-amber-300'
+                    }`}>
                     {selectedResult.status === 'success' ? 'Validation Passed' : 'Review Required'}
                   </div>
                 </div>
                 <div className="flex space-x-3">
                   {selectedResult.status === 'warning' && (
-                    <button 
+                    <button
                       onClick={handleManualReview}
                       className="px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg hover:from-amber-700 hover:to-orange-700 transition-all shadow-lg font-medium cursor-pointer"
                     >
