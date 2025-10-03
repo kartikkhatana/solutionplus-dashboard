@@ -19,8 +19,8 @@ export default function PurchaseOrdersPage() {
   ];
 
   const filteredOrders = purchaseOrders.filter(po => {
-    const matchesSearch = po.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         po.vendor.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.vendor.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -36,7 +36,7 @@ export default function PurchaseOrdersPage() {
   return (
     <div className="flex min-h-screen bg-[#fafafa]">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
@@ -169,16 +169,16 @@ export default function PurchaseOrdersPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-sm"
+              className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 text-sm text-slate-500"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="completed">Completed</option>
             </select>
-            <button className="px-6 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 text-sm">
+            {/* <button className="px-6 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 text-sm">
               + New PO
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -216,15 +216,14 @@ export default function PurchaseOrdersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex items-center text-xs">
-                      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                        po.status === 'active' ? 'bg-green-500' :
+                      <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${po.status === 'active' ? 'bg-green-500' :
                         po.status === 'pending' ? 'bg-yellow-500' :
-                        'bg-blue-500'
-                      }`}></span>
+                          'bg-blue-500'
+                        }`}></span>
                       <span className={
                         po.status === 'active' ? 'text-green-600' :
-                        po.status === 'pending' ? 'text-yellow-600' :
-                        'text-blue-600'
+                          po.status === 'pending' ? 'text-yellow-600' :
+                            'text-blue-600'
                       }>
                         {po.status.charAt(0).toUpperCase() + po.status.slice(1)}
                       </span>

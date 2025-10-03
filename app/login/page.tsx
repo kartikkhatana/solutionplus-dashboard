@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login } = useAuth();
   const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -84,7 +84,7 @@ export default function LoginPage() {
     
     setTimeout(() => {
       setLoading(false);
-      router.push('/dashboard');
+      login(credentials.email, credentials.password);
     }, 1000);
   };
 
