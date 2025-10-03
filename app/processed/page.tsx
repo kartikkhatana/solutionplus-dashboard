@@ -162,14 +162,22 @@ export default function ProcessedPage() {
                     <tr key={result.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{result.invoice}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.po}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.vendor}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-xs">
+                        <div className="break-words line-clamp-2" title={result.vendor}>
+                          {result.vendor}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">${result.amount.toLocaleString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
                           {result.source}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.processedDate}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-[140px]">
+                        <div className="break-words">
+                          {result.processedDate}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`font-bold ${result.status === 'success' ? 'text-green-600' : 'text-yellow-600'}`}>
                           {result.score}%

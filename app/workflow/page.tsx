@@ -2891,13 +2891,26 @@ This is an automated report from InvoiceFlow
                 </div>
               </div>
 
-              {/* Back Button */}
-              <div className="flex justify-start pt-4 border-t border-slate-200">
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-6 border-t-2 border-slate-200 mt-8">
                 <button 
                   onClick={() => setCurrentStep('output')}
-                  className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer font-medium"
                 >
                   ← Back to Output
+                </button>
+                
+                <button 
+                  onClick={handleSubmitAndDeliver}
+                  className="px-10 py-3 bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 text-white rounded-lg hover:from-green-700 hover:via-emerald-700 hover:to-green-700 transition-all shadow-xl hover:shadow-2xl cursor-pointer font-bold text-lg flex items-center space-x-3 transform hover:scale-105"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Submit & Mark as Processed</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
                 </button>
               </div>
             </div>
