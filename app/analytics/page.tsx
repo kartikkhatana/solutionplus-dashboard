@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Select from 'react-select';
 import Sidebar from '../components/Sidebar';
+import { customSelectStyles } from '@/lib/customSelectStyles';
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState({ value: '30d', label: 'Last 30 days' });
@@ -87,71 +88,6 @@ export default function AnalyticsPage() {
   // Get current data based on selected time range
   const monthlyData = allData[timeRange.value as keyof typeof allData].monthly;
   const currentMetrics = allData[timeRange.value as keyof typeof allData].metrics;
-
-  // Custom styles for react-select to match theme
-  const customSelectStyles = {
-    control: (base: Record<string, unknown>, state: { isFocused: boolean }) => ({
-      ...base,
-      minHeight: '44px',
-      borderRadius: '0.75rem',
-      borderColor: state.isFocused ? '#0f172a' : '#e2e8f0',
-      boxShadow: state.isFocused ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' : '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-      '&:hover': {
-        backgroundColor: '#f8fafc',
-        borderColor: '#e2e8f0'
-      },
-      cursor: 'pointer',
-      backgroundColor: 'white',
-      transition: 'all 0.2s'
-    }),
-    valueContainer: (base: Record<string, unknown>) => ({
-      ...base,
-      padding: '0 1rem',
-      fontWeight: '500',
-      fontSize: '0.875rem'
-    }),
-    singleValue: (base: Record<string, unknown>) => ({
-      ...base,
-      color: '#0f172a'
-    }),
-    menu: (base: Record<string, unknown>) => ({
-      ...base,
-      borderRadius: '0.75rem',
-      marginTop: '0.25rem',
-      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-      border: '1px solid #e2e8f0',
-      overflow: 'hidden'
-    }),
-    menuList: (base: Record<string, unknown>) => ({
-      ...base,
-      padding: '0.25rem',
-      borderRadius: '0.75rem'
-    }),
-    option: (base: Record<string, unknown>, state: { isSelected: boolean; isFocused: boolean }) => ({
-      ...base,
-      backgroundColor: state.isSelected ? '#0f172a' : state.isFocused ? '#f1f5f9' : 'white',
-      color: state.isSelected ? 'white' : '#0f172a',
-      cursor: 'pointer',
-      borderRadius: '0.5rem',
-      padding: '0.5rem 0.75rem',
-      fontSize: '0.875rem',
-      fontWeight: state.isSelected ? '500' : '400',
-      transition: 'all 0.15s',
-      '&:active': {
-        backgroundColor: state.isSelected ? '#0f172a' : '#e2e8f0'
-      }
-    }),
-    indicatorSeparator: () => ({
-      display: 'none'
-    }),
-    dropdownIndicator: (base: Record<string, unknown>) => ({
-      ...base,
-      color: '#64748b',
-      '&:hover': {
-        color: '#0f172a'
-      }
-    })
-  };
 
   const validationMetrics = [
     { name: 'Duplicate Check', successRate: 99.8, failures: 8, category: 'document' },
