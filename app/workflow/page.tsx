@@ -1779,7 +1779,7 @@ This is an automated report from InvoiceFlow
       <main className="flex-1 ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Invoice Processing Workflow</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Integration</h1>
           <p className="text-slate-600 mt-1">Complete pipeline from data ingestion to validation results</p>
         </div>
 

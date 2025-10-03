@@ -75,8 +75,8 @@ export default function DashboardPage() {
       <main className="flex-1 ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-1">Dashboard</h1>
-          <p className="text-sm text-slate-500">Here's your analytic details.</p>
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">Workflow</h1>
+          {/* <p className="text-sm text-slate-500">Here's your analytic details.</p> */}
         </div>
 
         {/* KPI Cards Row */}
