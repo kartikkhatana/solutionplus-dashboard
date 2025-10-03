@@ -171,7 +171,11 @@ export default function ProcessedPage() {
                           {result.source}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{result.processedDate}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-[140px]">
+                        <div className="break-words">
+                          {result.processedDate}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`font-bold ${result.status === 'success' ? 'text-green-600' : 'text-yellow-600'}`}>
                           {result.score}%
