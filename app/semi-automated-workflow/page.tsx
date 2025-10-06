@@ -59,6 +59,9 @@ export default function SemiAutomatedWorkflow() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+  const [gmailAccessToken, setGmailAccessToken] = useState<string | null>(null);
+  const [emailData, setEmailData] = useState<any[]>([]);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const handleConnect = () => {
     setConnectionStatus('connecting');
@@ -257,6 +260,130 @@ Invoice Processing Team
 
   const allRecordsProcessed = processedData.length > 0 && processedData.every(r => r.actionStatus === 'Approved' || r.actionStatus === 'Rejected');
 
+  const handleGmailConnect = async () => {
+    setIsAuthenticating(true);
+    try {
+      // Get Gmail auth URL
+      const response = await fetch('/api/gmail-auth');
+      const data = await response.json();
+      
+      if (data.success && data.authUrl) {
+        // Open auth popup
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        const popup = window.open(
+          data.authUrl,
+          'Gmail Authorization',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+
+        // Listen for auth callback
+        const checkPopup = setInterval(() => {
+          try {
+            if (popup?.closed) {
+              clearInterval(checkPopup);
+              setIsAuthenticating(false);
+              
+              // Check if token was stored
+              const token = localStorage.getItem('gmail_access_token');
+              if (token) {
+                setGmailAccessToken(token);
+                setConnectionStatus('connected');
+                showToastMessage('Successfully connected to Gmail!', 'success');
+                
+                // Start fetching emails
+                setTimeout(() => fetchEmails(token), 500);
+              } else {
+                showToastMessage('Gmail authentication cancelled', 'error');
+                setConnectionStatus('disconnected');
+              }
+            }
+          } catch (e) {
+            // Ignore cross-origin errors
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error connecting to Gmail:', error);
+      showToastMessage('Failed to connect to Gmail', 'error');
+      setIsAuthenticating(false);
+      setConnectionStatus('disconnected');
+    }
+  };
+
+  const fetchEmails = async (token: string) => {
+    setWorkflowStage('extraction');
+    setProcessingProgress(0);
+    
+    const interval = setInterval(() => 
+      setProcessingProgress(prev => prev >= 90 ? 90 : prev + 10), 
+      200
+    );
+    
+    try {
+      const response = await fetch('/api/email-automation', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      clearInterval(interval);
+      setProcessingProgress(100);
+      
+      if (data.success && data.emails) {
+        setEmailData(data.emails);
+        
+        // Convert email attachments to invoice format
+        const invoices: POInvoicePair[] = [];
+        data.emails.forEach((email: any, emailIdx: number) => {
+          email.processedAttachments?.forEach((attachment: any, attIdx: number) => {
+            const invoice: POInvoicePair = {
+              id: `email-${emailIdx}-${attIdx}`,
+              vendorName: attachment.vendor || email.from.split('<')[0].trim() || 'Unknown Vendor',
+              invoiceId: attachment.invoiceNumber || `INV-${Date.now()}-${attIdx}`,
+              poNumber: `PO-${new Date().getFullYear()}-${String(emailIdx + attIdx).padStart(3, '0')}`,
+              invoiceAmount: attachment.amount || 0,
+              poAmount: attachment.amount || 0,
+              invoiceDate: attachment.invoiceDate || new Date().toISOString().split('T')[0],
+              poDate: attachment.invoiceDate || new Date().toISOString().split('T')[0],
+              invoicePaymentTerms: 'Net 30',
+              poPaymentTerms: 'Net 30',
+              invoiceTaxAmount: (attachment.amount || 0) * 0.05,
+              poTaxAmount: (attachment.amount || 0) * 0.05,
+              invoiceShippingAddress: 'Extracted from email',
+              poShippingAddress: 'Extracted from email',
+              status: 'pending'
+            };
+            invoices.push(invoice);
+          });
+        });
+        
+        setExtractedData(invoices);
+        showToastMessage(`Successfully extracted ${invoices.length} invoice(s) from ${data.emails.length} email(s)`, 'success');
+        
+        setTimeout(() => setProcessingProgress(0), 1000);
+      } else {
+        showToastMessage('No invoices found in emails', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching emails:', error);
+      clearInterval(interval);
+      showToastMessage('Failed to fetch emails', 'error');
+      setProcessingProgress(0);
+    }
+  };
+
+  const showToastMessage = (message: string, type: 'success' | 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
   const handleWorkflowSelection = (type: WorkflowType) => {
     setWorkflowType(type);
     if (type === 'oracle') {
@@ -264,12 +391,10 @@ Invoice Processing Team
       setWorkflowStage('connection');
       // Immediately start the connection process (no button needed)
       setTimeout(() => handleConnect(), 100);
-    } else {
-      // Email automation - Coming soon
-      setToastType('success');
-      setToastMessage('Email Semi-Automation workflow coming soon!');
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+    } else if (type === 'email') {
+      // Email automation - Start Gmail connection
+      setWorkflowStage('connection');
+      setTimeout(() => handleGmailConnect(), 100);
     }
   };
 
@@ -451,9 +576,9 @@ Invoice Processing Team
                 className="bg-white rounded-2xl shadow-xl p-8 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-emerald-500 relative overflow-hidden"
               >
                 {/* Coming Soon Badge */}
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                {/* <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                   Coming Soon
-                </div>
+                </div> */}
                 
                 <div className="flex items-center justify-center mb-6">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center shadow-lg">
@@ -506,45 +631,92 @@ Invoice Processing Team
         {workflowStage === 'connection' && (
           <div className="max-w-3xl mx-auto mt-20">
             <div className="text-center mb-8">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+              <div className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center shadow-lg ${
+                workflowType === 'email' 
+                  ? 'bg-gradient-to-br from-emerald-600 to-green-600' 
+                  : 'bg-gradient-to-br from-blue-600 to-purple-600'
+              }`}>
+                {workflowType === 'email' ? (
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                ) : (
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                )}
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-3">Connect to Oracle Fusion ERP</h2>
-              <p className="text-slate-600 mb-8">Establish secure connection to extract vendor PO and invoice data</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">
+                {workflowType === 'email' ? 'Connect to Gmail' : 'Connect to Oracle Fusion ERP'}
+              </h2>
+              <p className="text-slate-600 mb-8">
+                {workflowType === 'email' 
+                  ? 'Authenticate with Gmail to fetch invoices from forwarded emails' 
+                  : 'Establish secure connection to extract vendor PO and invoice data'}
+              </p>
             </div>
 
             {connectionStatus === 'disconnected' && (
-              <button onClick={handleConnect} className="w-full py-4 rounded-xl text-lg font-semibold text-white transition-all transform hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl">
-                Connect to Oracle Fusion ERP
+              <button 
+                onClick={workflowType === 'email' ? handleGmailConnect : handleConnect} 
+                className={`w-full py-4 rounded-xl text-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                  workflowType === 'email'
+                    ? 'bg-gradient-to-r from-emerald-600 to-green-600'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600'
+                }`}>
+                {workflowType === 'email' ? 'Connect to Gmail' : 'Connect to Oracle Fusion ERP'}
               </button>
             )}
 
-            {connectionStatus === 'connecting' && (
+            {(connectionStatus === 'connecting' || isAuthenticating) && (
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
                 <div className="flex items-center justify-center mb-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+                  <div className={`animate-spin rounded-full h-12 w-12 border-4 border-t-transparent ${
+                    workflowType === 'email' ? 'border-emerald-600' : 'border-blue-600'
+                  }`}></div>
                 </div>
-                <p className="text-center text-slate-900 font-medium mb-4">Connecting to Oracle Fusion ERP...</p>
-                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-blue-600 to-purple-600" style={{ width: `${processingProgress}%` }} />
-                </div>
-                <p className="text-center text-slate-600 mt-2 text-sm">{processingProgress}% Complete</p>
+                <p className="text-center text-slate-900 font-medium mb-4">
+                  {workflowType === 'email' ? 'Connecting to Gmail...' : 'Connecting to Oracle Fusion ERP...'}
+                </p>
+                {connectionStatus === 'connecting' && (
+                  <>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-300 ${
+                        workflowType === 'email'
+                          ? 'bg-gradient-to-r from-emerald-600 to-green-600'
+                          : 'bg-gradient-to-r from-blue-600 to-purple-600'
+                      }`} style={{ width: `${processingProgress}%` }} />
+                    </div>
+                    <p className="text-center text-slate-600 mt-2 text-sm">{processingProgress}% Complete</p>
+                  </>
+                )}
+                {isAuthenticating && (
+                  <p className="text-center text-slate-600 text-sm mt-4">Please complete authentication in the popup window...</p>
+                )}
               </div>
             )}
 
-            {connectionStatus === 'connected' && (
-              <div className="bg-white rounded-xl shadow-lg border border-green-200 p-8 animate-pulse">
+            {connectionStatus === 'connected' && !isAuthenticating && (
+              <div className={`bg-white rounded-xl shadow-lg border p-8 animate-pulse ${
+                workflowType === 'email' ? 'border-emerald-200' : 'border-green-200'
+              }`}>
                 <div className="flex items-center justify-center mb-4">
-                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    workflowType === 'email' ? 'bg-emerald-100' : 'bg-green-100'
+                  }`}>
+                    <svg className={`w-8 h-8 ${
+                      workflowType === 'email' ? 'text-emerald-600' : 'text-green-600'
+                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                 </div>
-                <p className="text-center text-green-600 font-semibold text-lg">Successfully Connected!</p>
-                <p className="text-center text-slate-600 mt-2">Fetching vendor data...</p>
+                <p className={`text-center font-semibold text-lg ${
+                  workflowType === 'email' ? 'text-emerald-600' : 'text-green-600'
+                }`}>Successfully Connected!</p>
+                <p className="text-center text-slate-600 mt-2">
+                  {workflowType === 'email' ? 'Fetching emails...' : 'Fetching vendor data...'}
+                </p>
               </div>
             )}
           </div>
