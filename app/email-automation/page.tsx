@@ -7,8 +7,15 @@ export default function EmailAutomationCallback() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing authorization...');
+  const [hasProcessed, setHasProcessed] = useState(false);
 
   useEffect(() => {
+    // Prevent multiple executions (React StrictMode calls useEffect twice in dev)
+    if (hasProcessed) {
+      return;
+    }
+    setHasProcessed(true);
+    
     const code = searchParams.get('code');
     const error = searchParams.get('error');
 
@@ -87,7 +94,7 @@ export default function EmailAutomationCallback() {
         
         setTimeout(() => window.close(), 4000);
       });
-  }, [searchParams]);
+  }, [searchParams, hasProcessed]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-50">
