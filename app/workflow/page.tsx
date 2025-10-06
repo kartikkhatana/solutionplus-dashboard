@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import Select from 'react-select';
+import { customSelectStyles } from '@/lib/customSelectStyles';
 
 type WorkflowStep = 'ingestion' | 'processing' | 'output' | 'delivery';
 type IngestionMethod = 'pdf' | 'email' | 'mongodb' | 'azure' | 'fusion' | 'excel' | null;
@@ -2179,6 +2180,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
                           dbErrors.connectionString ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {dbErrors.connectionString ? (
                         <p className="text-red-600 text-xs mt-1 flex items-center">
@@ -2240,6 +2242,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.accountName ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {azureErrors.accountName && (
                         <p className="text-red-600 text-xs mt-1">{azureErrors.accountName}</p>
@@ -2255,6 +2258,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.accessKey ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {azureErrors.accessKey && (
                         <p className="text-red-600 text-xs mt-1">{azureErrors.accessKey}</p>
@@ -2270,6 +2274,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 bg-white ${
                           azureErrors.containerName ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {azureErrors.containerName && (
                         <p className="text-red-600 text-xs mt-1">{azureErrors.containerName}</p>
@@ -2325,6 +2330,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.instanceUrl ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {fusionErrors.instanceUrl && (
                         <p className="text-red-600 text-xs mt-1">{fusionErrors.instanceUrl}</p>
@@ -2340,6 +2346,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.username ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {fusionErrors.username && (
                         <p className="text-red-600 text-xs mt-1">{fusionErrors.username}</p>
@@ -2355,6 +2362,7 @@ This is an automated report from InvoiceFlow
                         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-900 bg-white ${
                           fusionErrors.password ? 'border-red-500' : 'border-slate-300'
                         }`}
+                        style={{ outline: "none" }}
                       />
                       {fusionErrors.password && (
                         <p className="text-red-600 text-xs mt-1">{fusionErrors.password}</p>
@@ -2369,21 +2377,7 @@ This is an automated report from InvoiceFlow
                           { label: 'v1', value: 'v1' },
                           { label: 'v2', value: 'v2' }
                         ]}
-                        className="text-slate-900"
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            borderRadius: '0.5rem',
-                            padding: '0.125rem',
-                            borderColor: '#cbd5e1',
-                            '&:hover': { borderColor: '#a855f7' },
-                            boxShadow: 'none',
-                            '&:focus-within': {
-                              borderColor: '#a855f7',
-                              boxShadow: '0 0 0 2px rgba(168, 85, 247, 0.1)'
-                            }
-                          })
-                        }}
+                        styles={customSelectStyles}
                       />
                       <p className="text-slate-500 text-xs mt-1">
                         💡 Select the REST API version for your Fusion instance
@@ -3299,6 +3293,7 @@ This is an automated report from InvoiceFlow
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white ${
                         mongoConfigErrors.connectionString ? 'border-red-500' : 'border-slate-300'
                       }`}
+                      style={{ outline: "none" }}
                     />
                     {mongoConfigErrors.connectionString && (
                       <p className="text-red-600 text-xs mt-1">{mongoConfigErrors.connectionString}</p>
@@ -3313,6 +3308,7 @@ This is an automated report from InvoiceFlow
                         value={mongoConfig.database}
                         onChange={(e) => setMongoConfig({...mongoConfig, database: e.target.value})}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white"
+                        style={{ outline: "none" }}
                       />
                     </div>
                     <div>
@@ -3322,6 +3318,7 @@ This is an automated report from InvoiceFlow
                         value={mongoConfig.collection}
                         onChange={(e) => setMongoConfig({...mongoConfig, collection: e.target.value})}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-900 bg-white"
+                        style={{ outline: "none" }}
                       />
                     </div>
                   </div>
@@ -3465,6 +3462,7 @@ This is an automated report from InvoiceFlow
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
                         emailConfigErrors.to ? 'border-red-500' : 'border-slate-300'
                       }`}
+                      style={{ outline: "none" }}
                     />
                     {emailConfigErrors.to && (
                       <p className="text-red-600 text-xs mt-1">{emailConfigErrors.to}</p>
@@ -3481,6 +3479,7 @@ This is an automated report from InvoiceFlow
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-slate-900 bg-white ${
                         emailConfigErrors.cc ? 'border-red-500' : 'border-slate-300'
                       }`}
+                      style={{ outline: "none" }}
                     />
                     {emailConfigErrors.cc && (
                       <p className="text-red-600 text-xs mt-1">{emailConfigErrors.cc}</p>
@@ -3650,21 +3649,7 @@ This is an automated report from InvoiceFlow
                         { label: 'POST', value: 'POST' },
                         { label: 'PUT', value: 'PUT' }
                       ]}
-                      className="text-slate-900"
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderRadius: '0.5rem',
-                          padding: '0.125rem',
-                          borderColor: '#cbd5e1',
-                          '&:hover': { borderColor: '#6366f1' },
-                          boxShadow: 'none',
-                          '&:focus-within': {
-                            borderColor: '#6366f1',
-                            boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.1)'
-                          }
-                        })
-                      }}
+                      styles={customSelectStyles}
                     />
                   </div>
 

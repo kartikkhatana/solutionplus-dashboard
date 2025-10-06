@@ -216,8 +216,9 @@ export default function IngestionPage() {
                   <input
                     type="text"
                     placeholder="mongodb://username:password@host:port/database"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
                     defaultValue="mongodb://localhost:27017/invoices"
+                    style={{ outline: "none" }}
                   />
                 </div>
                 <div>
@@ -225,8 +226,9 @@ export default function IngestionPage() {
                   <input
                     type="text"
                     placeholder="invoices"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
                     defaultValue="invoice_data"
+                    style={{ outline: "none" }}
                   />
                 </div>
                 <button className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
