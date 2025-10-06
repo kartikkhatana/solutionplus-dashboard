@@ -38,6 +38,11 @@ Gmail Emails → Dummy Invoice Data → MongoDB PO Matching → Field Comparison
    - Sends email replies to vendors
    - Includes approval/rejection notifications
 
+4. **`/api/mongodb/validations` (POST)**
+   - Saves validation results to MongoDB
+   - Stores approval/rejection details
+   - Records all field comparisons and match scores
+
 #### B. Frontend Workflow (`app/semi-automated-workflow/page.tsx`)
 
 **Stage 1: Email Selection**
@@ -90,7 +95,7 @@ Gmail Emails → Dummy Invoice Data → MongoDB PO Matching → Field Comparison
   - **Reject**: Sends rejection email to vendor
   - **Bulk Actions**: Process multiple records at once
 
-**Stage 4: Email Notifications**
+**Stage 4: Email Notifications & MongoDB Storage**
 - Automated email sent to original sender
 - Includes:
   - Approval/Rejection status
@@ -98,8 +103,19 @@ Gmail Emails → Dummy Invoice Data → MongoDB PO Matching → Field Comparison
   - Field-by-field comparison details
   - Discrepancies highlighted (if any)
   - Action items for vendor
+- **MongoDB Storage**: Validation results are automatically saved to MongoDB `invoice_validations` collection
+- Stored data includes:
+  - All field comparisons
+  - Match score and status
+  - Action taken (Approved/Rejected)
+  - Timestamp and vendor details
+  - Email thread ID for tracking
 
-## MongoDB Schema
+## MongoDB Schema & Collections
+
+The system uses multiple MongoDB databases and collections:
+
+### Database 1: `invoiceflow` (Invoice & PO Data)
 
 ### Purchase Order Document Structure (`purchase_order_dumps`)
 ```javascript
@@ -133,6 +149,41 @@ Gmail Emails → Dummy Invoice Data → MongoDB PO Matching → Field Comparison
   descriptionOfItems: String,
   quantity: Number,
   rate: Number
+}
+```
+
+### Database 2: `solutionplus` (Validation Results)
+
+### Validation Results Structure (`invoice_validations`)
+```javascript
+{
+  _id: ObjectId,
+  vendorName: String,
+  vendorEmail: String,
+  invoiceId: String,
+  poNumber: String,
+  fileName: String,        // PDF attachment name
+  invoiceAmount: Number,
+  poAmount: Number,
+  invoiceDate: String,
+  poDate: String,
+  matchScore: Number,      // 0-100
+  status: String,          // 'matched' or 'mismatched'
+  actionStatus: String,    // 'Approved' or 'Rejected'
+  actionDate: String,      // ISO date string
+  processedDate: String,
+  fieldComparisons: [      // Array of field comparison objects
+    {
+      field: String,
+      poValue: String,
+      invoiceValue: String,
+      match: Boolean
+    }
+  ],
+  emailThreadId: String,   // Gmail thread ID
+  workflowType: String,    // 'mongodb'
+  createdAt: Date,         // Auto-generated
+  updatedAt: Date          // Auto-generated
 }
 ```
 
@@ -255,6 +306,9 @@ db.Invoice_mock_data.insertMany([
 - **Individual Actions**: Approve/Reject from detail modal
 - **Bulk Actions**: Select multiple records and approve/reject all
 - System sends email notification to vendor for each action
+- **MongoDB Storage**: Validation results automatically saved to database
+  - Collection: `invoice_validations` in `solutionplus` database
+  - Includes: vendor details, match score, field comparisons, action status
 
 ### 7. Complete
 - When all records processed, click "Done"
@@ -376,5 +430,24 @@ The Email Semi-Automation workflow provides a complete solution for:
 - ✅ Automated vendor notifications
 - ✅ Bulk processing capabilities
 - ✅ Detailed audit trails
+- ✅ **Persistent storage of validation results in MongoDB**
+- ✅ **Historical tracking of all approval/rejection decisions**
 
-The system is production-ready for the described workflow, with dummy invoice data generation serving as a placeholder for future ML-based PDF extraction.
+### Key Features:
+1. **Dual Database Architecture**:
+   - `invoiceflow` database: Stores PO and Invoice master data
+   - `solutionplus` database: Stores validation results and audit trail
+
+2. **Complete Audit Trail**:
+   - Every approval/rejection is saved to MongoDB
+   - Includes full field comparison details
+   - Timestamped for compliance
+   - Linked to email thread for reference
+
+3. **Data Persistence**:
+   - All validation results preserved for reporting
+   - Historical analysis capability
+   - Vendor performance tracking
+   - Compliance documentation
+
+The system is production-ready for the described workflow, with comprehensive data storage and audit capabilities.
