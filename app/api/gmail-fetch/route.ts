@@ -19,16 +19,18 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Build query to fetch emails from specific sender with attachments
+    // Build query to fetch emails from specific sender
+    // Note: We don't filter by has:attachment here because we need to check
+    // if the LATEST message in each thread has attachments, not just any message
     const query = senderEmail 
-      ? `from:${senderEmail} has:attachment`
-      : 'has:attachment';
+      ? `from:${senderEmail}`
+      : '';
 
     // List messages
     const response = await gmail.users.messages.list({
       userId: 'me',
-      q: query,
-      maxResults: 50
+      q: query || undefined,
+      maxResults: 100 // Increased to get more threads
     });
 
     const messages = response.data.messages || [];
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch full message details for each message
     const emailsData = await Promise.all(
-      messages.slice(0, 20).map(async (message) => {
+      messages.slice(0, 50).map(async (message) => {
         try {
           const fullMessage = await gmail.users.messages.get({
             userId: 'me',
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
           const to = headers.find((h) => h.name === 'To')?.value || 'Unknown';
           const date = headers.find((h) => h.name === 'Date')?.value || '';
           const messageId = headers.find((h) => h.name === 'Message-ID')?.value || '';
+          const internalDate = fullMessage.data.internalDate || '0';
 
           // Extract body
           let body = '';
@@ -94,6 +97,7 @@ export async function POST(request: NextRequest) {
             from,
             to,
             date,
+            internalDate: parseInt(internalDate), // Timestamp for sorting
             body: body.substring(0, 500), // Truncate body
             attachments,
             snippet: fullMessage.data.snippet
@@ -107,10 +111,44 @@ export async function POST(request: NextRequest) {
 
     const validEmails = emailsData.filter((email) => email !== null);
 
+    // Group emails by threadId and keep only the latest email per thread
+    const threadMap = new Map<string, any>();
+    
+    for (const email of validEmails) {
+      const threadId = email.threadId;
+      
+      // Skip if threadId is missing
+      if (!threadId) continue;
+      
+      const existingEmail = threadMap.get(threadId);
+      
+      // Keep the email with the latest internalDate (most recent)
+      if (!existingEmail || email.internalDate > existingEmail.internalDate) {
+        threadMap.set(threadId, email);
+      }
+    }
+
+    // Convert map back to array and filter to keep only threads where the latest email has attachments
+    const latestEmailsPerThread = Array.from(threadMap.values())
+      .filter(email => {
+        // Only keep if the latest email has attachments
+        return email.attachments && email.attachments.length > 0;
+      })
+      .map(email => {
+        // If email has multiple attachments, keep only the latest one (last in array)
+        if (email.attachments && email.attachments.length > 1) {
+          email.attachments = [email.attachments[email.attachments.length - 1]];
+        }
+        
+        // Remove internalDate from response as it's only needed for sorting
+        const { internalDate, ...emailWithoutInternalDate } = email;
+        return emailWithoutInternalDate;
+      });
+
     return NextResponse.json({ 
-      emails: validEmails,
-      count: validEmails.length,
-      message: `Found ${validEmails.length} emails with attachments`
+      emails: latestEmailsPerThread,
+      count: latestEmailsPerThread.length,
+      message: `Found ${latestEmailsPerThread.length} email thread(s) where the latest message has attachments`
     });
 
   } catch (error: any) {
