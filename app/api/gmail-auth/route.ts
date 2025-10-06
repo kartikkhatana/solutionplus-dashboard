@@ -16,15 +16,19 @@ const SCOPES = [
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const action = searchParams.get('action');
+  
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/email-automation';
 
   if (action === 'authorize') {
-    // Generate authorization URL
+    // Generate authorization URL with explicit redirect_uri
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
-      prompt: 'consent'
+      prompt: 'consent',
+      redirect_uri: redirectUri
     });
 
+    console.log('Generated auth URL with redirect_uri:', redirectUri);
     return NextResponse.json({ authUrl });
   }
 
@@ -36,8 +40,18 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const { tokens } = await oauth2Client.getToken(code);
+      console.log('Attempting to exchange code for tokens...');
+      console.log('Using redirect_uri:', redirectUri);
+      
+      // Exchange code for tokens with explicit redirect_uri
+      const { tokens } = await oauth2Client.getToken({
+        code: code,
+        redirect_uri: redirectUri
+      });
+      
       oauth2Client.setCredentials(tokens);
+      
+      console.log('Successfully obtained tokens');
 
       // In production, store tokens securely (database, encrypted storage)
       return NextResponse.json({ 
@@ -45,9 +59,18 @@ export async function GET(request: NextRequest) {
         tokens: tokens,
         message: 'Successfully authenticated with Gmail'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting tokens:', error);
-      return NextResponse.json({ error: 'Failed to authenticate' }, { status: 500 });
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status
+      });
+      
+      return NextResponse.json({ 
+        error: error.message || 'Failed to authenticate',
+        details: 'Check that your Google OAuth redirect URI matches exactly: ' + redirectUri
+      }, { status: 500 });
     }
   }
 

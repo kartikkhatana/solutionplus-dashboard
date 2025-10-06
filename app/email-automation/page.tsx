@@ -7,8 +7,15 @@ export default function EmailAutomationCallback() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing authorization...');
+  const [hasProcessed, setHasProcessed] = useState(false);
 
   useEffect(() => {
+    // Prevent multiple executions (React StrictMode calls useEffect twice in dev)
+    if (hasProcessed) {
+      return;
+    }
+    setHasProcessed(true);
+    
     const code = searchParams.get('code');
     const error = searchParams.get('error');
 
@@ -33,44 +40,61 @@ export default function EmailAutomationCallback() {
     });
     
     fetch('/api/gmail-auth?' + params.toString())
-      .then(res => {
+      .then(async res => {
         console.log('API Response status:', res.status);
-        return res.json();
-      })
-      .then(data => {
+        const data = await res.json();
         console.log('API Response data:', data);
         
-        if (data.success && data.tokens) {
-          setStatus('success');
-          setMessage('Authorization successful! Redirecting...');
-          
-          console.log('Sending tokens to parent window');
-          
-          // Send tokens to parent window
-          if (window.opener) {
-            window.opener.postMessage({
-              type: 'GMAIL_AUTH_SUCCESS',
-              tokens: data.tokens
-            }, window.location.origin);
-          } else {
-            console.error('No window.opener available!');
-          }
+        // Check if response is OK (status 200-299)
+        if (!res.ok) {
+          throw new Error(data.error || `Server error: ${res.status}`);
+        }
+        
+        return data;
+      })
+      .then(data => {
+        // Double-check we have valid data
+        if (!data.success || !data.tokens) {
+          throw new Error(data.error || 'No tokens received from server');
+        }
+        
+        setStatus('success');
+        setMessage('Authorization successful! Redirecting...');
+        
+        console.log('Sending tokens to parent window');
+        
+        // Send tokens to parent window
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'GMAIL_AUTH_SUCCESS',
+            tokens: data.tokens
+          }, window.location.origin);
           
           // Close popup after a short delay
           setTimeout(() => window.close(), 1500);
         } else {
-          const errorMsg = data.error || 'Failed to get tokens';
-          console.error('API returned error:', errorMsg);
-          throw new Error(errorMsg);
+          console.error('No window.opener available!');
+          setStatus('error');
+          setMessage('Unable to communicate with parent window');
+          setTimeout(() => window.close(), 3000);
         }
       })
       .catch(err => {
         console.error('Error exchanging code for tokens:', err);
         setStatus('error');
-        setMessage(`Failed to complete authorization: ${err.message}`);
-        setTimeout(() => window.close(), 3000);
+        setMessage(`Authorization failed: ${err.message}`);
+        
+        // Send failure message to parent window so it doesn't show false success
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'GMAIL_AUTH_FAILED',
+            error: err.message
+          }, window.location.origin);
+        }
+        
+        setTimeout(() => window.close(), 4000);
       });
-  }, [searchParams]);
+  }, [searchParams, hasProcessed]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-50">

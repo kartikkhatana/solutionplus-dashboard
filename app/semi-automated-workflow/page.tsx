@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
 type WorkflowStage = 'home' | 'connection' | 'extraction' | 'processing' | 'output';
-type WorkflowType = 'oracle' | 'email' | null;
+type WorkflowType = 'oracle' | 'email' | 'mongodb' | null;
 type RecordStatus = 'pending' | 'matched' | 'mismatched';
 
 interface FieldComparison {
@@ -65,6 +65,8 @@ export default function SemiAutomatedWorkflow() {
   const [emails, setEmails] = useState<any[]>([]);
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState('');
 
   const handleConnect = () => {
     setConnectionStatus('connecting');
@@ -182,48 +184,101 @@ export default function SemiAutomatedWorkflow() {
     const mismatches = selectedDetail.fieldComparisons?.filter(fc => !fc.match) || [];
     const matchedFields = selectedDetail.fieldComparisons?.filter(fc => fc.match) || [];
     
-    const emailContent = `
-=== EMAIL NOTIFICATION ===
-To: ${selectedDetail.vendorName}
-Subject: Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${selectedDetail.invoiceId}
-
-Dear ${selectedDetail.vendorName},
-
-Your invoice ${selectedDetail.invoiceId} for PO ${selectedDetail.poNumber} has been ${action === 'approve' ? 'APPROVED' : 'REJECTED'}.
-
-VALIDATION SUMMARY:
-- Match Score: ${selectedDetail.matchScore}%
-- Status: ${selectedDetail.status === 'matched' ? 'Fully Matched' : 'Discrepancies Found'}
-- Total Fields Validated: ${selectedDetail.fieldComparisons?.length}
-- Fields Matched: ${matchedFields.length}
-- Fields Mismatched: ${mismatches.length}
-
-${mismatches.length > 0 ? `
-DISCREPANCIES FOUND:
-${mismatches.map((m, i) => `
-${i + 1}. ${m.field}:
-   - Purchase Order Value: ${m.poValue}
-   - Invoice Value: ${m.invoiceValue}
-   - Issue: Values do not match
-`).join('\n')}
-
-${action === 'reject' ? 'Please review and resubmit the corrected invoice.' : 'Despite discrepancies, this invoice has been approved for processing.'}
-` : `
-All fields have been validated successfully.
-${action === 'approve' ? 'The invoice has been approved for payment processing.' : ''}
-`}
-
-MATCHED FIELDS:
-${matchedFields.map((m, i) => `${i + 1}. ${m.field}: ✓ Validated`).join('\n')}
-
-Best regards,
-Invoice Processing Team
+    // Create HTML email body
+    const emailBodyHTML = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: ${action === 'approve' ? '#10b981' : '#ef4444'};">
+            Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'}
+          </h2>
+          
+          <p>Dear ${selectedDetail.vendorName},</p>
+          
+          <p>Your invoice <strong>${selectedDetail.invoiceId}</strong> for PO <strong>${selectedDetail.poNumber}</strong> has been <strong>${action === 'approve' ? 'APPROVED' : 'REJECTED'}</strong>.</p>
+          
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Validation Summary</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li>📊 Match Score: <strong>${selectedDetail.matchScore}%</strong></li>
+              <li>✅ Status: ${selectedDetail.status === 'matched' ? 'Fully Matched' : 'Discrepancies Found'}</li>
+              <li>📝 Total Fields Validated: ${selectedDetail.fieldComparisons?.length}</li>
+              <li>✓ Fields Matched: ${matchedFields.length}</li>
+              <li>✗ Fields Mismatched: ${mismatches.length}</li>
+            </ul>
+          </div>
+          
+          ${mismatches.length > 0 ? `
+          <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0;">
+            <h3 style="color: #dc2626; margin-top: 0;">Discrepancies Found</h3>
+            ${mismatches.map((m, i) => `
+            <div style="margin-bottom: 15px;">
+              <strong>${i + 1}. ${m.field}</strong>
+              <ul style="margin: 5px 0;">
+                <li>Purchase Order: ${m.poValue}</li>
+                <li>Invoice: ${m.invoiceValue}</li>
+                <li style="color: #dc2626;">⚠️ Values do not match</li>
+              </ul>
+            </div>
+            `).join('')}
+            ${action === 'reject' ? '<p style="color: #dc2626; font-weight: bold;">Please review and resubmit the corrected invoice.</p>' : '<p>Despite discrepancies, this invoice has been approved for processing.</p>'}
+          </div>
+          ` : `
+          <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+            <p style="color: #059669; margin: 0;">✅ All fields have been validated successfully.</p>
+            ${action === 'approve' ? '<p style="margin: 10px 0 0 0;">The invoice has been approved for payment processing.</p>' : ''}
+          </div>
+          `}
+          
+          <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Matched Fields</h3>
+            <ul>
+              ${matchedFields.map((m, i) => `<li>${i + 1}. ${m.field}: ✓ Validated</li>`).join('')}
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">Best regards,<br><strong>Invoice Processing Team</strong></p>
+        </div>
+      </body>
+    </html>
     `;
     
-    console.log(emailContent);
-    
-    // Simulate email sending delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Send email via Gmail API if tokens available (for email and mongodb workflows)
+    if ((workflowType === 'email' || workflowType === 'mongodb') && gmailTokens) {
+      try {
+        const response = await fetch('/api/gmail-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokens: gmailTokens,
+            threadId: (selectedDetail as any).emailThreadId,
+            to: (selectedDetail as any).vendorEmail || selectedDetail.vendorName,
+            subject: `Re: Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${selectedDetail.invoiceId}`,
+            body: emailBodyHTML
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to send email');
+        }
+        
+        console.log('Email sent successfully to:', (selectedDetail as any).vendorEmail);
+      } catch (error) {
+        console.error('Error sending email:', error);
+        setToastType('error');
+        setToastMessage(`Failed to send email: ${(error as Error).message}`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        return;
+      }
+    } else {
+      // For Oracle workflow, just log to console
+      console.log('Email notification (console output for Oracle workflow):');
+      console.log(emailBodyHTML);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
     
     // Update the record's action status
     setProcessedData(prev => prev.map(r => 
@@ -322,6 +377,26 @@ Invoice Processing Team
             console.log('About to fetch emails with tokens');
             fetchGmailEmails(event.data.tokens);
           }, 2000);
+        } else if (event.data.type === 'GMAIL_AUTH_FAILED') {
+          console.error('OAuth failed:', event.data.error);
+          authSucceeded = false;
+          
+          // Clean up listener
+          window.removeEventListener('message', messageHandler);
+          if (checkClosed) clearInterval(checkClosed);
+          
+          // Reset states and show error
+          setIsAuthenticating(false);
+          setConnectionStatus('disconnected');
+          setProcessingProgress(0);
+          setWorkflowStage('home');
+          setWorkflowType(null);
+          
+          // Show error toast
+          setToastType('error');
+          setToastMessage(`Gmail authorization failed: ${event.data.error || 'Unknown error'}`);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 4000);
         }
       };
       
@@ -335,14 +410,18 @@ Invoice Processing Team
           
           // Only show error if auth didn't succeed
           if (!authSucceeded) {
-            setToastType('error');
-            setToastMessage('Authorization cancelled or failed');
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 3000);
+            // Reset all states
             setIsAuthenticating(false);
             setConnectionStatus('disconnected');
+            setProcessingProgress(0);
             setWorkflowStage('home');
             setWorkflowType(null);
+            
+            // Show error toast
+            setToastType('error');
+            setToastMessage('Gmail authorization cancelled. Please try again.');
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
           }
         }
       }, 500);
@@ -429,44 +508,156 @@ Invoice Processing Team
     setProcessingProgress(0);
     setWorkflowStage('processing');
     
-    const interval = setInterval(() => setProcessingProgress(prev => prev >= 100 ? 100 : prev + 5), 100);
-    
-    // Simulate PDF processing and matching
-    setTimeout(() => {
-      clearInterval(interval);
+    try {
+      const selectedEmailsList = emails.filter(e => selectedEmails.has(e.id));
+      const matched: POInvoicePair[] = [];
+      let progress = 0;
       
-      // Use mock data for now - in production, process real PDFs
-      const processed = MOCK_DATA.slice(0, selectedEmails.size).map(record => {
-        const fieldComparisons: FieldComparison[] = [
-          { field: 'PO Number', poValue: record.poNumber, invoiceValue: record.poNumber, match: true },
-          { field: 'Vendor Name', poValue: record.vendorName, invoiceValue: record.vendorName, match: true },
-          { field: 'Invoice Date', poValue: record.poDate, invoiceValue: record.invoiceDate, match: record.poDate === record.invoiceDate },
-          { field: 'Total Amount', poValue: `$${record.poAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceAmount.toFixed(2)}`, match: Math.abs(record.poAmount - record.invoiceAmount) < 0.01 },
-          { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
-          { field: 'Payment Terms', poValue: record.poPaymentTerms, invoiceValue: record.invoicePaymentTerms, match: record.poPaymentTerms === record.invoicePaymentTerms },
-          { field: 'Shipping Address', poValue: record.poShippingAddress, invoiceValue: record.invoiceShippingAddress, match: record.poShippingAddress === record.invoiceShippingAddress },
-          { field: 'Tax Amount', poValue: `$${record.poTaxAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceTaxAmount.toFixed(2)}`, match: Math.abs(record.poTaxAmount - record.invoiceTaxAmount) < 0.01 }
-        ];
-
-        const matchCount = fieldComparisons.filter(c => c.match).length;
-        const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
-        const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
-
-        return {
-          ...record,
-          status,
-          processedDate: new Date().toISOString().split('T')[0],
-          matchScore,
-          fieldComparisons,
-          actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected'
-        };
-      });
+      // Process each selected email
+      for (const email of selectedEmailsList) {
+        // Process each PDF attachment in the email
+        for (const attachment of email.attachments) {
+          if (attachment.filename.toLowerCase().endsWith('.pdf')) {
+            try {
+              setProcessingProgress(Math.min(progress, 30));
+              
+              // Fetch invoice data from MongoDB Invoice_mock_data collection
+              const invoiceResponse = await fetch(`/api/mongodb/invoice-mock-data?fileName=${encodeURIComponent(attachment.filename)}`);
+              const invoiceData = await invoiceResponse.json();
+              
+              if (!invoiceData.success || !invoiceData.invoices || invoiceData.invoices.length === 0) {
+                console.error(`No invoice mock data found for ${attachment.filename}`);
+                continue; // Skip this attachment if no invoice data found
+              }
+              
+              const invoiceFromDB = invoiceData.invoices[0];
+              
+              setProcessingProgress(Math.min(progress + 20, 60));
+              
+              // Fetch matching PO from MongoDB based on fileName
+              const poResponse = await fetch(`/api/mongodb/purchase-orders?fileName=${encodeURIComponent(attachment.filename)}`);
+              const poData = await poResponse.json();
+              
+              if (poData.success && poData.purchaseOrders && poData.purchaseOrders.length > 0) {
+                const matchingPO = poData.purchaseOrders[0];
+                
+                setProcessingProgress(Math.min(progress + 30, 80));
+                
+                // Create field comparisons between invoice and PO
+                const fieldComparisons: FieldComparison[] = [
+                  {
+                    field: 'PO Number',
+                    poValue: matchingPO.poNumber || 'N/A',
+                    invoiceValue: invoiceFromDB.poNumber || 'N/A',
+                    match: matchingPO.poNumber === invoiceFromDB.poNumber
+                  },
+                  {
+                    field: 'Vendor Name',
+                    poValue: matchingPO.vendorName || 'N/A',
+                    invoiceValue: invoiceFromDB.vendorName || 'N/A',
+                    match: matchingPO.vendorName?.toLowerCase() === invoiceFromDB.vendorName?.toLowerCase()
+                  },
+                  {
+                    field: 'Date',
+                    poValue: matchingPO.date || 'N/A',
+                    invoiceValue: invoiceFromDB.date || 'N/A',
+                    match: matchingPO.date === invoiceFromDB.date
+                  },
+                  {
+                    field: 'Total Amount',
+                    poValue: `${matchingPO.currency || 'AED'} ${(matchingPO.totalAmount || 0).toLocaleString('en-AE', { minimumFractionDigits: 2 })}`,
+                    invoiceValue: `${invoiceFromDB.currency || 'AED'} ${(invoiceFromDB.totalAmount || 0).toLocaleString('en-AE', { minimumFractionDigits: 2 })}`,
+                    match: Math.abs((matchingPO.totalAmount || 0) - (invoiceFromDB.totalAmount || 0)) < 0.01
+                  },
+                  {
+                    field: 'Currency',
+                    poValue: matchingPO.currency || 'AED',
+                    invoiceValue: invoiceFromDB.currency || 'AED',
+                    match: (matchingPO.currency || 'AED') === (invoiceFromDB.currency || 'AED')
+                  },
+                  {
+                    field: 'Description of Items',
+                    poValue: matchingPO.descriptionOfItems || 'N/A',
+                    invoiceValue: invoiceFromDB.descriptionOfItems || 'N/A',
+                    match: matchingPO.descriptionOfItems === invoiceFromDB.descriptionOfItems
+                  },
+                  {
+                    field: 'Quantity',
+                    poValue: String(matchingPO.quantity || 0),
+                    invoiceValue: String(invoiceFromDB.quantity || 0),
+                    match: matchingPO.quantity === invoiceFromDB.quantity
+                  }
+                ];
+                
+                const matchCount = fieldComparisons.filter(c => c.match).length;
+                const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
+                const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
+                
+                matched.push({
+                  id: `${email.id}-${attachment.filename}`,
+                  vendorName: invoiceFromDB.vendorName,
+                  invoiceId: `INV-${attachment.filename.replace('.pdf', '')}`,
+                  poNumber: matchingPO.poNumber || 'N/A',
+                  invoiceAmount: invoiceFromDB.totalAmount,
+                  poAmount: matchingPO.totalAmount || 0,
+                  invoiceDate: invoiceFromDB.date,
+                  poDate: matchingPO.date || '',
+                  invoicePaymentTerms: matchingPO.paymentTerms || 'N/A',
+                  poPaymentTerms: matchingPO.paymentTerms || 'N/A',
+                  invoiceTaxAmount: matchingPO.taxAmount || 0,
+                  poTaxAmount: matchingPO.taxAmount || 0,
+                  invoiceShippingAddress: matchingPO.shippingAddress || 'N/A',
+                  poShippingAddress: matchingPO.shippingAddress || 'N/A',
+                  status,
+                  processedDate: new Date().toISOString().split('T')[0],
+                  matchScore,
+                  fieldComparisons,
+                  actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected',
+                  // Store email info for reply functionality
+                  emailThreadId: email.threadId,
+                  vendorEmail: email.from.match(/<(.+)>/)?.[1] || email.from,
+                  fileName: attachment.filename
+                } as any);
+              }
+              
+              progress += (80 / (selectedEmailsList.length * email.attachments.length));
+            } catch (error) {
+              console.error(`Error processing ${attachment.filename}:`, error);
+            }
+          }
+        }
+      }
       
-      setProcessedData(processed);
+      setProcessingProgress(100);
+      
+      if (matched.length === 0) {
+        setToastType('error');
+        setToastMessage('No matching POs found in MongoDB for the selected emails.');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 4000);
+        setIsProcessing(false);
+        setWorkflowStage('extraction');
+      } else {
+        setProcessedData(matched);
+        setToastType('success');
+        setToastMessage(`Successfully matched ${matched.length} invoice${matched.length > 1 ? 's' : ''} with POs from MongoDB`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setIsProcessing(false);
+        setProcessingProgress(0);
+        setWorkflowStage('output');
+      }
+      
+    } catch (error) {
+      console.error('Error processing PDFs:', error);
       setIsProcessing(false);
       setProcessingProgress(0);
-      setWorkflowStage('output');
-    }, 2500);
+      setToastType('error');
+      setToastMessage('Failed to process PDFs. Please try again.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      setWorkflowStage('extraction');
+    }
   };
 
   const toggleEmailSelection = (id: string) => {
@@ -479,6 +670,7 @@ Invoice Processing Team
     setSelectedEmails(selectedEmails.size === emails.length ? new Set() : new Set(emails.map(e => e.id)));
   };
 
+
   const handleWorkflowSelection = (type: WorkflowType) => {
     setWorkflowType(type);
     if (type === 'oracle') {
@@ -488,6 +680,10 @@ Invoice Processing Team
       setTimeout(() => handleConnect(), 100);
     } else if (type === 'email') {
       // Start Gmail workflow
+      setWorkflowStage('connection');
+      setTimeout(() => handleGmailAuth(), 100);
+    } else if (type === 'mongodb') {
+      // Start MongoDB + Gmail workflow
       setWorkflowStage('connection');
       setTimeout(() => handleGmailAuth(), 100);
     }
@@ -614,8 +810,8 @@ Invoice Processing Team
 
         {/* Home - Workflow Selection */}
         {workflowStage === 'home' && (
-          <div className="max-w-5xl mx-auto mt-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="max-w-6xl mx-auto mt-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Oracle Fusion ERP Card */}
               <div 
                 onClick={() => handleWorkflowSelection('oracle')}
@@ -710,6 +906,55 @@ Invoice Processing Team
                 <div className="mt-8 text-center">
                   <button className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg">
                     Start Email Workflow
+                  </button>
+                </div>
+              </div>
+
+              {/* MongoDB Email Semi-Automation Card */}
+              <div 
+                onClick={() => handleWorkflowSelection('mongodb')}
+                className="bg-white rounded-2xl shadow-xl p-8 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-teal-500 relative overflow-hidden"
+              >
+                <div className="flex items-center justify-center mb-6">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-600 to-cyan-600 flex items-center justify-center shadow-lg">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 text-center mb-3">MongoDB Email Automation</h3>
+                <p className="text-slate-600 text-center mb-6">
+                  Process invoices stored in MongoDB with automated validation and vendor notification workflows
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Connect to MongoDB database</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Query stored email invoices</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Batch processing capabilities</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Historical data analysis</span>
+                  </div>
+                </div>
+                <div className="mt-8 text-center">
+                  <button className="px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-lg">
+                    Start MongoDB Workflow
                   </button>
                 </div>
               </div>
@@ -840,8 +1085,8 @@ Invoice Processing Team
           </div>
         )}
 
-        {/* Email List - Gmail Workflow */}
-        {workflowStage === 'extraction' && workflowType === 'email' && (
+        {/* Email List - Gmail Workflow and MongoDB Workflow */}
+        {workflowStage === 'extraction' && (workflowType === 'email' || workflowType === 'mongodb') && (
           <div className="bg-white rounded-xl shadow-lg p-8">
             <div className="mb-6 flex items-center justify-between">
               <div>
