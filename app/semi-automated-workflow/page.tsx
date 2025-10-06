@@ -59,6 +59,12 @@ export default function SemiAutomatedWorkflow() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+  
+  // Gmail-specific states
+  const [gmailTokens, setGmailTokens] = useState<any>(null);
+  const [emails, setEmails] = useState<any[]>([]);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const handleConnect = () => {
     setConnectionStatus('connecting');
@@ -257,6 +263,222 @@ Invoice Processing Team
 
   const allRecordsProcessed = processedData.length > 0 && processedData.every(r => r.actionStatus === 'Approved' || r.actionStatus === 'Rejected');
 
+  // Gmail handlers
+  const handleGmailAuth = async () => {
+    setIsAuthenticating(true);
+    setConnectionStatus('connecting');
+    setProcessingProgress(0);
+    
+    try {
+      const response = await fetch('/api/gmail-auth?action=authorize');
+      const { authUrl } = await response.json();
+      
+      // Open auth popup
+      const width = 500;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const authWindow = window.open(
+        authUrl,
+        'Gmail Authorization',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+      
+      // Track if auth succeeded
+      let authSucceeded = false;
+      
+      // Listen for message from OAuth callback
+      const messageHandler = (event: MessageEvent) => {
+        console.log('Received message:', event.data);
+        
+        // Verify the message origin matches our app
+        if (event.origin !== window.location.origin) {
+          console.log('Message origin mismatch:', event.origin, 'expected:', window.location.origin);
+          return;
+        }
+        
+        if (event.data.type === 'GMAIL_AUTH_SUCCESS' && event.data.tokens) {
+          console.log('OAuth success! Tokens received:', event.data.tokens);
+          authSucceeded = true;
+          
+          // Store tokens
+          setGmailTokens(event.data.tokens);
+          
+          // Update UI
+          setConnectionStatus('connected');
+          setProcessingProgress(100);
+          setToastType('success');
+          setToastMessage('Successfully authenticated with Gmail!');
+          setShowToast(true);
+          
+          // Clean up listener
+          window.removeEventListener('message', messageHandler);
+          if (checkClosed) clearInterval(checkClosed);
+          
+          // Fetch emails directly with the tokens from the message
+          setTimeout(() => {
+            setShowToast(false);
+            console.log('About to fetch emails with tokens');
+            fetchGmailEmails(event.data.tokens);
+          }, 2000);
+        }
+      };
+      
+      window.addEventListener('message', messageHandler);
+      
+      // Also check if window closes without success (user cancelled)
+      const checkClosed = setInterval(() => {
+        if (authWindow?.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', messageHandler);
+          
+          // Only show error if auth didn't succeed
+          if (!authSucceeded) {
+            setToastType('error');
+            setToastMessage('Authorization cancelled or failed');
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+            setIsAuthenticating(false);
+            setConnectionStatus('disconnected');
+            setWorkflowStage('home');
+            setWorkflowType(null);
+          }
+        }
+      }, 500);
+      
+    } catch (error) {
+      setToastType('error');
+      setToastMessage('Failed to authenticate with Gmail');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      setIsAuthenticating(false);
+      setConnectionStatus('disconnected');
+    }
+  };
+
+  const fetchGmailEmails = async (tokensParam?: any) => {
+    try {
+      // Use passed tokens or state tokens
+      const tokens = tokensParam || gmailTokens;
+      
+      if (!tokens) {
+        setToastType('error');
+        setToastMessage('No authentication tokens available');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        return;
+      }
+
+      console.log('Fetching emails with tokens:', tokens);
+
+      // Fetch real emails from Gmail API
+      const response = await fetch('/api/gmail-fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: tokens,
+          senderEmail: process.env.EMAIL_SENDER_FILTER // Empty to fetch all emails with attachments, or specify like 'xyz@gmail.com'
+        })
+      });
+
+      console.log('Email fetch response status:', response.status);
+      const data = await response.json();
+      console.log('Email fetch response data:', data);
+
+      if (!response.ok) {
+        console.error('Email fetch failed:', data);
+        throw new Error(data.error || 'Failed to fetch emails');
+      }
+
+      if (data.emails && data.emails.length > 0) {
+        console.log(`Successfully fetched ${data.emails.length} emails`);
+        setEmails(data.emails);
+        setWorkflowStage('extraction');
+        setToastType('success');
+        setToastMessage(`Found ${data.emails.length} emails with attachments`);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } else {
+        console.log('No emails found');
+        setToastType('error');
+        setToastMessage(data.message || 'No emails found with PDF attachments');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        setWorkflowStage('home');
+        setWorkflowType(null);
+      }
+      
+      setIsAuthenticating(false);
+    } catch (error: any) {
+      console.error('Error fetching emails:', error);
+      setToastType('error');
+      setToastMessage(error.message || 'Failed to fetch emails');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      setIsAuthenticating(false);
+      setWorkflowStage('home');
+      setWorkflowType(null);
+    }
+  };
+
+  const processEmailPDFs = async () => {
+    if (selectedEmails.size === 0) return;
+    
+    setIsProcessing(true);
+    setProcessingProgress(0);
+    setWorkflowStage('processing');
+    
+    const interval = setInterval(() => setProcessingProgress(prev => prev >= 100 ? 100 : prev + 5), 100);
+    
+    // Simulate PDF processing and matching
+    setTimeout(() => {
+      clearInterval(interval);
+      
+      // Use mock data for now - in production, process real PDFs
+      const processed = MOCK_DATA.slice(0, selectedEmails.size).map(record => {
+        const fieldComparisons: FieldComparison[] = [
+          { field: 'PO Number', poValue: record.poNumber, invoiceValue: record.poNumber, match: true },
+          { field: 'Vendor Name', poValue: record.vendorName, invoiceValue: record.vendorName, match: true },
+          { field: 'Invoice Date', poValue: record.poDate, invoiceValue: record.invoiceDate, match: record.poDate === record.invoiceDate },
+          { field: 'Total Amount', poValue: `$${record.poAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceAmount.toFixed(2)}`, match: Math.abs(record.poAmount - record.invoiceAmount) < 0.01 },
+          { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
+          { field: 'Payment Terms', poValue: record.poPaymentTerms, invoiceValue: record.invoicePaymentTerms, match: record.poPaymentTerms === record.invoicePaymentTerms },
+          { field: 'Shipping Address', poValue: record.poShippingAddress, invoiceValue: record.invoiceShippingAddress, match: record.poShippingAddress === record.invoiceShippingAddress },
+          { field: 'Tax Amount', poValue: `$${record.poTaxAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceTaxAmount.toFixed(2)}`, match: Math.abs(record.poTaxAmount - record.invoiceTaxAmount) < 0.01 }
+        ];
+
+        const matchCount = fieldComparisons.filter(c => c.match).length;
+        const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
+        const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
+
+        return {
+          ...record,
+          status,
+          processedDate: new Date().toISOString().split('T')[0],
+          matchScore,
+          fieldComparisons,
+          actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected'
+        };
+      });
+      
+      setProcessedData(processed);
+      setIsProcessing(false);
+      setProcessingProgress(0);
+      setWorkflowStage('output');
+    }, 2500);
+  };
+
+  const toggleEmailSelection = (id: string) => {
+    const newSelection = new Set(selectedEmails);
+    newSelection.has(id) ? newSelection.delete(id) : newSelection.add(id);
+    setSelectedEmails(newSelection);
+  };
+
+  const toggleSelectAllEmails = () => {
+    setSelectedEmails(selectedEmails.size === emails.length ? new Set() : new Set(emails.map(e => e.id)));
+  };
+
   const handleWorkflowSelection = (type: WorkflowType) => {
     setWorkflowType(type);
     if (type === 'oracle') {
@@ -264,12 +486,10 @@ Invoice Processing Team
       setWorkflowStage('connection');
       // Immediately start the connection process (no button needed)
       setTimeout(() => handleConnect(), 100);
-    } else {
-      // Email automation - Coming soon
-      setToastType('success');
-      setToastMessage('Email Semi-Automation workflow coming soon!');
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+    } else if (type === 'email') {
+      // Start Gmail workflow
+      setWorkflowStage('connection');
+      setTimeout(() => handleGmailAuth(), 100);
     }
   };
 
@@ -450,11 +670,6 @@ Invoice Processing Team
                 onClick={() => handleWorkflowSelection('email')}
                 className="bg-white rounded-2xl shadow-xl p-8 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-emerald-500 relative overflow-hidden"
               >
-                {/* Coming Soon Badge */}
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                  Coming Soon
-                </div>
-                
                 <div className="flex items-center justify-center mb-6">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center shadow-lg">
                     <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,29 +721,57 @@ Invoice Processing Team
         {workflowStage === 'connection' && (
           <div className="max-w-3xl mx-auto mt-20">
             <div className="text-center mb-8">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+              <div className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center shadow-lg ${
+                workflowType === 'oracle' 
+                  ? 'bg-gradient-to-br from-blue-600 to-purple-600' 
+                  : 'bg-gradient-to-br from-emerald-600 to-green-600'
+              }`}>
+                {workflowType === 'oracle' ? (
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                ) : (
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                )}
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-3">Connect to Oracle Fusion ERP</h2>
-              <p className="text-slate-600 mb-8">Establish secure connection to extract vendor PO and invoice data</p>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">
+                {workflowType === 'oracle' ? 'Connect to Oracle Fusion ERP' : 'Connect to Gmail'}
+              </h2>
+              <p className="text-slate-600 mb-8">
+                {workflowType === 'oracle' 
+                  ? 'Establish secure connection to extract vendor PO and invoice data'
+                  : 'Authorize access to Gmail to fetch emails with invoice attachments'}
+              </p>
             </div>
 
             {connectionStatus === 'disconnected' && (
-              <button onClick={handleConnect} className="w-full py-4 rounded-xl text-lg font-semibold text-white transition-all transform hover:scale-105 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl">
-                Connect to Oracle Fusion ERP
+              <button onClick={workflowType === 'oracle' ? handleConnect : handleGmailAuth} className={`w-full py-4 rounded-xl text-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                workflowType === 'oracle'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600'
+                  : 'bg-gradient-to-r from-emerald-600 to-green-600'
+              }`}>
+                {workflowType === 'oracle' ? 'Connect to Oracle Fusion ERP' : 'Connect to Gmail'}
               </button>
             )}
 
             {connectionStatus === 'connecting' && (
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
                 <div className="flex items-center justify-center mb-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+                  <div className={`animate-spin rounded-full h-12 w-12 border-4 border-t-transparent ${
+                    workflowType === 'oracle' ? 'border-blue-600' : 'border-emerald-600'
+                  }`}></div>
                 </div>
-                <p className="text-center text-slate-900 font-medium mb-4">Connecting to Oracle Fusion ERP...</p>
+                <p className="text-center text-slate-900 font-medium mb-4">
+                  {workflowType === 'oracle' ? 'Connecting to Oracle Fusion ERP...' : 'Connecting to Gmail...'}
+                </p>
                 <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-blue-600 to-purple-600" style={{ width: `${processingProgress}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-300 ${
+                    workflowType === 'oracle' 
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600'
+                      : 'bg-gradient-to-r from-emerald-600 to-green-600'
+                  }`} style={{ width: `${processingProgress}%` }} />
                 </div>
                 <p className="text-center text-slate-600 mt-2 text-sm">{processingProgress}% Complete</p>
               </div>
@@ -544,14 +787,16 @@ Invoice Processing Team
                   </div>
                 </div>
                 <p className="text-center text-green-600 font-semibold text-lg">Successfully Connected!</p>
-                <p className="text-center text-slate-600 mt-2">Fetching vendor data...</p>
+                <p className="text-center text-slate-600 mt-2">
+                  {workflowType === 'oracle' ? 'Fetching vendor data...' : 'Fetching emails...'}
+                </p>
               </div>
             )}
           </div>
         )}
 
         {/* Extraction Stage */}
-        {workflowStage === 'extraction' && (
+        {workflowStage === 'extraction' && workflowType === 'oracle' && (
           <div className="bg-white rounded-xl shadow-lg p-8">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -587,6 +832,59 @@ Invoice Processing Team
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.invoiceId}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.poNumber}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 text-right">${record.invoiceAmount.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Email List - Gmail Workflow */}
+        {workflowStage === 'extraction' && workflowType === 'email' && (
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Emails with PDF Attachments</h2>
+                <p className="text-slate-600">Select emails to process PO and Invoice documents</p>
+              </div>
+              <button onClick={processEmailPDFs} disabled={selectedEmails.size === 0}
+                className="px-6 py-3 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-lg">
+                Process Selected ({selectedEmails.size})
+              </button>
+            </div>
+
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left">
+                      <input type="checkbox" checked={selectedEmails.size === emails.length && emails.length > 0} onChange={toggleSelectAllEmails} className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">From</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Subject</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Attachments</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {emails.map((email) => (
+                    <tr key={email.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-4">
+                        <input type="checkbox" checked={selectedEmails.has(email.id)} onChange={() => toggleEmailSelection(email.id)} className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{email.from}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-md truncate">{email.subject}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{email.date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <span className="text-sm font-bold text-slate-900">{email.attachments.length} PDF{email.attachments.length > 1 ? 's' : ''}</span>
+                          <span className="text-xs text-slate-500">({email.attachments.map((a: any) => a.filename).join(', ')})</span>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

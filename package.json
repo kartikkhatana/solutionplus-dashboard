@@ -10,6 +10,7 @@
     "seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} scripts/seed-mongodb.ts"
   },
   "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
     "googleapis": "^161.0.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
