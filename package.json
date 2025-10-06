@@ -10,7 +10,10 @@
     "seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} scripts/seed-mongodb.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "@aws-sdk/lib-storage": "^3.903.0",
     "@google-cloud/local-auth": "^3.0.1",
+    "framer-motion": "^12.23.22",
     "googleapis": "^161.0.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
