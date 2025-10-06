@@ -61,7 +61,19 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
   ];
 
   useEffect(() => {
-    setSteps(initializeSteps());
+    // Don't initialize steps until connected
+    if (isConnected) {
+      const initialSteps = initializeSteps();
+      // Mark Step 1 as completed since Gmail is already connected
+      initialSteps[0] = {
+        ...initialSteps[0],
+        status: 'completed',
+        message: 'Connected successfully',
+        progress: 100,
+        timestamp: new Date().toISOString()
+      };
+      setSteps(initialSteps);
+    }
 
     // Listen for Gmail auth messages
     const handleMessage = (event: MessageEvent) => {
@@ -76,7 +88,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [isConnected]);
 
   const resetWorkflow = () => {
     setSteps(initializeSteps());
@@ -412,11 +424,12 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
           </div>
         </motion.div>
 
-        {/* Workflow Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <AnimatePresence>
-            {steps.map((step, index) => (
-              <motion.div
+        {/* Workflow Steps - Only show when connected */}
+        {isConnected && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <AnimatePresence>
+              {steps.map((step, index) => (
+                <motion.div
                 key={step.step}
                 className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm"
                 initial={{ opacity: 0, y: 20 }}
@@ -454,9 +467,10 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                   )}
                 </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Summary Results */}
         <AnimatePresence>
