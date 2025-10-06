@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
 type WorkflowStage = 'home' | 'connection' | 'extraction' | 'processing' | 'output';
-type WorkflowType = 'oracle' | 'email' | null;
+type WorkflowType = 'oracle' | 'email' | 'mongodb' | null;
 type RecordStatus = 'pending' | 'matched' | 'mismatched';
 
 interface FieldComparison {
@@ -243,8 +243,8 @@ export default function SemiAutomatedWorkflow() {
     </html>
     `;
     
-    // Send email via Gmail API if tokens available
-    if (workflowType === 'email' && gmailTokens) {
+    // Send email via Gmail API if tokens available (for email and mongodb workflows)
+    if ((workflowType === 'email' || workflowType === 'mongodb') && gmailTokens) {
       try {
         const response = await fetch('/api/gmail-send', {
           method: 'POST',
@@ -264,7 +264,7 @@ export default function SemiAutomatedWorkflow() {
           throw new Error(result.error || 'Failed to send email');
         }
         
-        console.log('Email sent successfully:', result);
+        console.log('Email sent successfully to:', (selectedDetail as any).vendorEmail);
       } catch (error) {
         console.error('Error sending email:', error);
         setToastType('error');
@@ -510,7 +510,7 @@ export default function SemiAutomatedWorkflow() {
     
     try {
       const selectedEmailsList = emails.filter(e => selectedEmails.has(e.id));
-      const allProcessedDocs: any[] = [];
+      const matched: POInvoicePair[] = [];
       let progress = 0;
       
       // Process each selected email
@@ -519,30 +519,105 @@ export default function SemiAutomatedWorkflow() {
         for (const attachment of email.attachments) {
           if (attachment.filename.toLowerCase().endsWith('.pdf')) {
             try {
-              setProcessingProgress(Math.min(progress, 90));
+              setProcessingProgress(Math.min(progress, 30));
               
-              const response = await fetch('/api/gmail-process-pdfs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  tokens: gmailTokens,
-                  messageId: email.id,
-                  attachmentId: attachment.attachmentId,
-                  filename: attachment.filename
-                })
-              });
+              // Fetch invoice data from MongoDB Invoice_mock_data collection
+              const invoiceResponse = await fetch(`/api/mongodb/invoice-mock-data?fileName=${encodeURIComponent(attachment.filename)}`);
+              const invoiceData = await invoiceResponse.json();
               
-              const data = await response.json();
+              if (!invoiceData.success || !invoiceData.invoices || invoiceData.invoices.length === 0) {
+                console.error(`No invoice mock data found for ${attachment.filename}`);
+                continue; // Skip this attachment if no invoice data found
+              }
               
-              if (response.ok && data.extractedData) {
-                allProcessedDocs.push({
-                  emailId: email.id,
-                  emailFrom: email.from,
-                  emailSubject: email.subject,
+              const invoiceFromDB = invoiceData.invoices[0];
+              
+              setProcessingProgress(Math.min(progress + 20, 60));
+              
+              // Fetch matching PO from MongoDB based on fileName
+              const poResponse = await fetch(`/api/mongodb/purchase-orders?fileName=${encodeURIComponent(attachment.filename)}`);
+              const poData = await poResponse.json();
+              
+              if (poData.success && poData.purchaseOrders && poData.purchaseOrders.length > 0) {
+                const matchingPO = poData.purchaseOrders[0];
+                
+                setProcessingProgress(Math.min(progress + 30, 80));
+                
+                // Create field comparisons between invoice and PO
+                const fieldComparisons: FieldComparison[] = [
+                  {
+                    field: 'PO Number',
+                    poValue: matchingPO.poNumber || 'N/A',
+                    invoiceValue: invoiceFromDB.poNumber || 'N/A',
+                    match: matchingPO.poNumber === invoiceFromDB.poNumber
+                  },
+                  {
+                    field: 'Vendor Name',
+                    poValue: matchingPO.vendorName || 'N/A',
+                    invoiceValue: invoiceFromDB.vendorName || 'N/A',
+                    match: matchingPO.vendorName?.toLowerCase() === invoiceFromDB.vendorName?.toLowerCase()
+                  },
+                  {
+                    field: 'Date',
+                    poValue: matchingPO.date || 'N/A',
+                    invoiceValue: invoiceFromDB.date || 'N/A',
+                    match: matchingPO.date === invoiceFromDB.date
+                  },
+                  {
+                    field: 'Total Amount',
+                    poValue: `${matchingPO.currency || 'AED'} ${(matchingPO.totalAmount || 0).toLocaleString('en-AE', { minimumFractionDigits: 2 })}`,
+                    invoiceValue: `${invoiceFromDB.currency || 'AED'} ${(invoiceFromDB.totalAmount || 0).toLocaleString('en-AE', { minimumFractionDigits: 2 })}`,
+                    match: Math.abs((matchingPO.totalAmount || 0) - (invoiceFromDB.totalAmount || 0)) < 0.01
+                  },
+                  {
+                    field: 'Currency',
+                    poValue: matchingPO.currency || 'AED',
+                    invoiceValue: invoiceFromDB.currency || 'AED',
+                    match: (matchingPO.currency || 'AED') === (invoiceFromDB.currency || 'AED')
+                  },
+                  {
+                    field: 'Description of Items',
+                    poValue: matchingPO.descriptionOfItems || 'N/A',
+                    invoiceValue: invoiceFromDB.descriptionOfItems || 'N/A',
+                    match: matchingPO.descriptionOfItems === invoiceFromDB.descriptionOfItems
+                  },
+                  {
+                    field: 'Quantity',
+                    poValue: String(matchingPO.quantity || 0),
+                    invoiceValue: String(invoiceFromDB.quantity || 0),
+                    match: matchingPO.quantity === invoiceFromDB.quantity
+                  }
+                ];
+                
+                const matchCount = fieldComparisons.filter(c => c.match).length;
+                const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
+                const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
+                
+                matched.push({
+                  id: `${email.id}-${attachment.filename}`,
+                  vendorName: invoiceFromDB.vendorName,
+                  invoiceId: `INV-${attachment.filename.replace('.pdf', '')}`,
+                  poNumber: matchingPO.poNumber || 'N/A',
+                  invoiceAmount: invoiceFromDB.totalAmount,
+                  poAmount: matchingPO.totalAmount || 0,
+                  invoiceDate: invoiceFromDB.date,
+                  poDate: matchingPO.date || '',
+                  invoicePaymentTerms: matchingPO.paymentTerms || 'N/A',
+                  poPaymentTerms: matchingPO.paymentTerms || 'N/A',
+                  invoiceTaxAmount: matchingPO.taxAmount || 0,
+                  poTaxAmount: matchingPO.taxAmount || 0,
+                  invoiceShippingAddress: matchingPO.shippingAddress || 'N/A',
+                  poShippingAddress: matchingPO.shippingAddress || 'N/A',
+                  status,
+                  processedDate: new Date().toISOString().split('T')[0],
+                  matchScore,
+                  fieldComparisons,
+                  actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected',
+                  // Store email info for reply functionality
                   emailThreadId: email.threadId,
-                  filename: attachment.filename,
-                  ...data.extractedData
-                });
+                  vendorEmail: email.from.match(/<(.+)>/)?.[1] || email.from,
+                  fileName: attachment.filename
+                } as any);
               }
               
               progress += (80 / (selectedEmailsList.length * email.attachments.length));
@@ -553,151 +628,25 @@ export default function SemiAutomatedWorkflow() {
         }
       }
       
-      setProcessingProgress(90);
-      
-      // Match POs and Invoices
-      const pos = allProcessedDocs.filter(doc => doc.documentType === 'PO');
-      const invoices = allProcessedDocs.filter(doc => doc.documentType === 'Invoice');
-      
-      const matched: POInvoicePair[] = [];
-      
-      // Try to match each invoice with a PO
-      for (const invoice of invoices) {
-        const matchingPO = pos.find(po => 
-          po.poNumber === invoice.poNumber || 
-          po.vendorName?.toLowerCase() === invoice.vendorName?.toLowerCase()
-        );
-        
-        if (matchingPO) {
-          // Create field comparisons
-          const fieldComparisons: FieldComparison[] = [
-            {
-              field: 'PO Number',
-              poValue: matchingPO.poNumber || 'N/A',
-              invoiceValue: invoice.invoiceNumber || 'N/A',
-              match: matchingPO.poNumber === invoice.poNumber
-            },
-            {
-              field: 'Vendor Name',
-              poValue: matchingPO.vendorName || 'N/A',
-              invoiceValue: invoice.vendorName || 'N/A',
-              match: matchingPO.vendorName?.toLowerCase() === invoice.vendorName?.toLowerCase()
-            },
-            {
-              field: 'Invoice Date',
-              poValue: matchingPO.date || 'N/A',
-              invoiceValue: invoice.date || 'N/A',
-              match: matchingPO.date === invoice.date
-            },
-            {
-              field: 'Total Amount',
-              poValue: `$${(matchingPO.totalAmount || 0).toFixed(2)}`,
-              invoiceValue: `$${(invoice.totalAmount || 0).toFixed(2)}`,
-              match: Math.abs((matchingPO.totalAmount || 0) - (invoice.totalAmount || 0)) < 0.01
-            },
-            {
-              field: 'Currency',
-              poValue: 'USD',
-              invoiceValue: 'USD',
-              match: true
-            },
-            {
-              field: 'Payment Terms',
-              poValue: matchingPO.paymentTerms || 'N/A',
-              invoiceValue: invoice.paymentTerms || 'N/A',
-              match: matchingPO.paymentTerms === invoice.paymentTerms
-            },
-            {
-              field: 'Shipping Address',
-              poValue: matchingPO.shippingAddress || 'N/A',
-              invoiceValue: invoice.shippingAddress || 'N/A',
-              match: matchingPO.shippingAddress === invoice.shippingAddress
-            },
-            {
-              field: 'Tax Amount',
-              poValue: `$${(matchingPO.taxAmount || 0).toFixed(2)}`,
-              invoiceValue: `$${(invoice.taxAmount || 0).toFixed(2)}`,
-              match: Math.abs((matchingPO.taxAmount || 0) - (invoice.taxAmount || 0)) < 0.01
-            }
-          ];
-          
-          const matchCount = fieldComparisons.filter(c => c.match).length;
-          const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
-          const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
-          
-          matched.push({
-            id: `${invoice.emailId}-${invoice.filename}`,
-            vendorName: invoice.vendorName || 'Unknown Vendor',
-            invoiceId: invoice.invoiceNumber || 'N/A',
-            poNumber: matchingPO.poNumber || 'N/A',
-            invoiceAmount: invoice.totalAmount || 0,
-            poAmount: matchingPO.totalAmount || 0,
-            invoiceDate: invoice.date || '',
-            poDate: matchingPO.date || '',
-            invoicePaymentTerms: invoice.paymentTerms || 'N/A',
-            poPaymentTerms: matchingPO.paymentTerms || 'N/A',
-            invoiceTaxAmount: invoice.taxAmount || 0,
-            poTaxAmount: matchingPO.taxAmount || 0,
-            invoiceShippingAddress: invoice.shippingAddress || 'N/A',
-            poShippingAddress: matchingPO.shippingAddress || 'N/A',
-            status,
-            processedDate: new Date().toISOString().split('T')[0],
-            matchScore,
-            fieldComparisons,
-            actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected',
-            // Store email info for reply functionality
-            emailThreadId: invoice.emailThreadId,
-            vendorEmail: invoice.emailFrom
-          } as any);
-        }
-      }
-      
       setProcessingProgress(100);
       
       if (matched.length === 0) {
-        // No matches found - use mock data as fallback
-        const mockProcessed = MOCK_DATA.slice(0, selectedEmails.size).map(record => {
-          const fieldComparisons: FieldComparison[] = [
-            { field: 'PO Number', poValue: record.poNumber, invoiceValue: record.poNumber, match: true },
-            { field: 'Vendor Name', poValue: record.vendorName, invoiceValue: record.vendorName, match: true },
-            { field: 'Invoice Date', poValue: record.poDate, invoiceValue: record.invoiceDate, match: record.poDate === record.invoiceDate },
-            { field: 'Total Amount', poValue: `$${record.poAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceAmount.toFixed(2)}`, match: Math.abs(record.poAmount - record.invoiceAmount) < 0.01 },
-            { field: 'Currency', poValue: 'USD', invoiceValue: 'USD', match: true },
-            { field: 'Payment Terms', poValue: record.poPaymentTerms, invoiceValue: record.invoicePaymentTerms, match: record.poPaymentTerms === record.invoicePaymentTerms },
-            { field: 'Shipping Address', poValue: record.poShippingAddress, invoiceValue: record.invoiceShippingAddress, match: record.poShippingAddress === record.invoiceShippingAddress },
-            { field: 'Tax Amount', poValue: `$${record.poTaxAmount.toFixed(2)}`, invoiceValue: `$${record.invoiceTaxAmount.toFixed(2)}`, match: Math.abs(record.poTaxAmount - record.invoiceTaxAmount) < 0.01 }
-          ];
-
-          const matchCount = fieldComparisons.filter(c => c.match).length;
-          const matchScore = Math.round((matchCount / fieldComparisons.length) * 100);
-          const status: RecordStatus = matchCount === fieldComparisons.length ? 'matched' : 'mismatched';
-
-          return {
-            ...record,
-            status,
-            processedDate: new Date().toISOString().split('T')[0],
-            matchScore,
-            fieldComparisons,
-            actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected'
-          };
-        });
-        
-        setProcessedData(mockProcessed);
         setToastType('error');
-        setToastMessage('No PO/Invoice pairs found in PDFs. Using sample data.');
+        setToastMessage('No matching POs found in MongoDB for the selected emails.');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 4000);
+        setIsProcessing(false);
+        setWorkflowStage('extraction');
       } else {
         setProcessedData(matched);
         setToastType('success');
-        setToastMessage(`Successfully processed ${matched.length} PO/Invoice pair${matched.length > 1 ? 's' : ''}`);
+        setToastMessage(`Successfully matched ${matched.length} invoice${matched.length > 1 ? 's' : ''} with POs from MongoDB`);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
+        setIsProcessing(false);
+        setProcessingProgress(0);
+        setWorkflowStage('output');
       }
-      
-      setIsProcessing(false);
-      setProcessingProgress(0);
-      setWorkflowStage('output');
       
     } catch (error) {
       console.error('Error processing PDFs:', error);
@@ -721,6 +670,7 @@ export default function SemiAutomatedWorkflow() {
     setSelectedEmails(selectedEmails.size === emails.length ? new Set() : new Set(emails.map(e => e.id)));
   };
 
+
   const handleWorkflowSelection = (type: WorkflowType) => {
     setWorkflowType(type);
     if (type === 'oracle') {
@@ -730,6 +680,10 @@ export default function SemiAutomatedWorkflow() {
       setTimeout(() => handleConnect(), 100);
     } else if (type === 'email') {
       // Start Gmail workflow
+      setWorkflowStage('connection');
+      setTimeout(() => handleGmailAuth(), 100);
+    } else if (type === 'mongodb') {
+      // Start MongoDB + Gmail workflow
       setWorkflowStage('connection');
       setTimeout(() => handleGmailAuth(), 100);
     }
@@ -856,8 +810,8 @@ Invoice Processing Team
 
         {/* Home - Workflow Selection */}
         {workflowStage === 'home' && (
-          <div className="max-w-5xl mx-auto mt-12">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="max-w-6xl mx-auto mt-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Oracle Fusion ERP Card */}
               <div 
                 onClick={() => handleWorkflowSelection('oracle')}
@@ -952,6 +906,55 @@ Invoice Processing Team
                 <div className="mt-8 text-center">
                   <button className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg">
                     Start Email Workflow
+                  </button>
+                </div>
+              </div>
+
+              {/* MongoDB Email Semi-Automation Card */}
+              <div 
+                onClick={() => handleWorkflowSelection('mongodb')}
+                className="bg-white rounded-2xl shadow-xl p-8 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-teal-500 relative overflow-hidden"
+              >
+                <div className="flex items-center justify-center mb-6">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-600 to-cyan-600 flex items-center justify-center shadow-lg">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 text-center mb-3">MongoDB Email Automation</h3>
+                <p className="text-slate-600 text-center mb-6">
+                  Process invoices stored in MongoDB with automated validation and vendor notification workflows
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Connect to MongoDB database</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Query stored email invoices</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Batch processing capabilities</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Historical data analysis</span>
+                  </div>
+                </div>
+                <div className="mt-8 text-center">
+                  <button className="px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-lg">
+                    Start MongoDB Workflow
                   </button>
                 </div>
               </div>
@@ -1082,8 +1085,8 @@ Invoice Processing Team
           </div>
         )}
 
-        {/* Email List - Gmail Workflow */}
-        {workflowStage === 'extraction' && workflowType === 'email' && (
+        {/* Email List - Gmail Workflow and MongoDB Workflow */}
+        {workflowStage === 'extraction' && (workflowType === 'email' || workflowType === 'mongodb') && (
           <div className="bg-white rounded-xl shadow-lg p-8">
             <div className="mb-6 flex items-center justify-between">
               <div>
