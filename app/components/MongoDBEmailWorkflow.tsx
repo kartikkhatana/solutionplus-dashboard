@@ -399,60 +399,121 @@ export default function MongoDBEmailWorkflow({ onBack }: MongoDBEmailWorkflowPro
       try {
         const mismatches = result.fieldComparisons.filter(fc => !fc.match);
         const matchedFields = result.fieldComparisons.filter(fc => fc.match);
+        
+        // Extract field comparisons for easier access
+        const poNumberComp = result.fieldComparisons.find(f => f.field === 'PO Number');
+        const vendorNameComp = result.fieldComparisons.find(f => f.field === 'Vendor Name');
+        const dateComp = result.fieldComparisons.find(f => f.field === 'Date');
+        const amountComp = result.fieldComparisons.find(f => f.field === 'Total Amount');
+        const currencyComp = result.fieldComparisons.find(f => f.field === 'Currency');
+        const descriptionComp = result.fieldComparisons.find(f => f.field === 'Description of Items');
+        const quantityComp = result.fieldComparisons.find(f => f.field === 'Quantity');
 
         const emailBodyHTML = `
         <html>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: ${result.status === 'matched' ? '#10b981' : '#f59e0b'};">
-                Invoice Processing Report - ${result.status === 'matched' ? 'VALIDATED' : 'REVIEW REQUIRED'}
-              </h2>
-              
-              <p>Dear ${result.vendorName},</p>
-              
-              <p>Your invoice <strong>${result.invoiceId}</strong> for PO <strong>${result.poNumber}</strong> has been processed through our automated MongoDB validation system.</p>
-              
-              <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0;">Validation Summary</h3>
-                <ul style="list-style: none; padding: 0;">
-                  <li>📊 Match Score: <strong>${result.matchScore}%</strong></li>
-                  <li>✅ Status: ${result.status === 'matched' ? 'Fully Validated' : 'Review Required'}</li>
-                  <li>📝 Total Fields Validated: ${result.fieldComparisons.length}</li>
-                  <li>✓ Fields Matched: ${matchedFields.length}</li>
-                  <li>✗ Fields Mismatched: ${mismatches.length}</li>
-                </ul>
+          <head>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #2c3e50; background: #f8f9fa; margin: 0; padding: 0; }
+              .container { max-width: 650px; margin: 40px auto; background: white; border: 1px solid #dee2e6; }
+              .header { padding: 30px 40px; border-bottom: 3px solid #2c3e50; }
+              .status-line { font-size: 13px; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+              .title { font-size: 24px; font-weight: 600; color: #2c3e50; margin: 0; }
+              .content { padding: 40px; }
+              .info-table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+              .info-table td { padding: 12px 0; border-bottom: 1px solid #e9ecef; }
+              .info-table td:first-child { font-weight: 600; color: #495057; width: 180px; }
+              .info-table td:last-child { color: #2c3e50; }
+              .info-table tr:last-child td { border-bottom: none; }
+              .section-title { font-size: 16px; font-weight: 600; color: #2c3e50; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #e9ecef; }
+              .footer { padding: 25px 40px; background: #f8f9fa; border-top: 1px solid #dee2e6; font-size: 13px; color: #6c757d; }
+              .score-badge { display: inline-block; padding: 6px 14px; background: #e9ecef; color: #2c3e50; font-weight: 600; font-size: 14px; border-radius: 4px; margin: 15px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <!-- Header -->
+              <div class="header">
+                <div class="status-line">Invoice Validation Report</div>
+                <div class="title">Invoice ${result.status === 'matched' ? 'Approved' : 'Rejected'}</div>
+                <div class="score-badge">Match Score: ${result.matchScore}%</div>
               </div>
               
+              <!-- Content -->
+              <div class="content">
+                <p style="margin: 0 0 25px 0; font-size: 15px; color: #495057;">Dear ${result.vendorName},</p>
+                
+                <p style="margin: 0 0 25px 0; font-size: 15px; color: #495057;">
+                  Your invoice has been processed through our automated validation system and has been 
+                  <strong>${result.status === 'matched' ? 'approved' : 'rejected'}</strong> for payment processing.
+                </p>
+                
+                <!-- Invoice Details Table -->
+                <div class="section-title">Invoice Details</div>
+                <table class="info-table">
+                  <tr>
+                    <td>PO Number</td>
+                    <td>${poNumberComp?.invoiceValue || result.poNumber}</td>
+                  </tr>
+                  <tr>
+                    <td>Vendor Name</td>
+                    <td>${vendorNameComp?.invoiceValue || result.vendorName}</td>
+                  </tr>
+                  <tr>
+                    <td>Date</td>
+                    <td>${dateComp?.invoiceValue || result.invoiceDate}</td>
+                  </tr>
+                  <tr>
+                    <td>Total Amount</td>
+                    <td><strong>${amountComp?.invoiceValue || result.invoiceAmount.toLocaleString()}</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Currency</td>
+                    <td>${currencyComp?.invoiceValue || 'AED'}</td>
+                  </tr>
+                  <tr>
+                    <td>Description of Items</td>
+                    <td>${descriptionComp?.invoiceValue || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Quantity</td>
+                    <td>${quantityComp?.invoiceValue || 'N/A'}</td>
+                  </tr>
+                </table>
+              
               ${mismatches.length > 0 ? `
-              <div style="background: #fef3cd; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-                <h3 style="color: #92400e; margin-top: 0;">Fields Requiring Review</h3>
-                ${mismatches.map((m, i) => `
-                <div style="margin-bottom: 15px;">
-                  <strong>${i + 1}. ${m.field}</strong>
-                  <ul style="margin: 5px 0;">
-                    <li>Purchase Order: ${m.poValue}</li>
-                    <li>Invoice: ${m.invoiceValue}</li>
-                    <li style="color: #92400e;">⚠️ Values do not match</li>
-                  </ul>
-                </div>
-                `).join('')}
-                <p style="color: #92400e; font-weight: bold;">Please review and provide clarification for the mismatched fields.</p>
+              <!-- Mismatched Fields Section -->
+              <div class="section-title" style="color: #dc2626; border-color: #dc2626;">Fields That Did Not Match</div>
+              <table class="info-table" style="margin-bottom: 25px;">
+                <thead>
+                  <tr style="background: #fef2f2;">
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; width: 180px; border-bottom: 2px solid #e9ecef; text-align: left;">Field Name</th>
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; border-bottom: 2px solid #e9ecef; text-align: left;">Purchase Order</th>
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; border-bottom: 2px solid #e9ecef; text-align: left;">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${mismatches.map(m => `
+                  <tr style="background: #fff5f5;">
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; font-weight: 600; color: #dc2626;">${m.field}</td>
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; color: #2c3e50;">${m.poValue}</td>
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; color: #2c3e50;">${m.invoiceValue}</td>
+                  </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div style="background: #fef2f2; border-left: 3px solid #dc2626; padding: 15px; margin: 20px 0;">
+                <p style="color: #dc2626; margin: 0; font-weight: 600;">
+                  ${result.status === 'matched' ? '⚠️ Despite discrepancies, this invoice has been approved for processing.' : '⚠️ Please review and resubmit the corrected invoice with matching values.'}
+                </p>
               </div>
               ` : `
               <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
-                <p style="color: #059669; margin: 0;">✅ All fields have been validated successfully against our MongoDB database.</p>
-                <p style="margin: 10px 0 0 0;">The invoice has been approved for payment processing.</p>
+                <p style="color: #059669; margin: 0;">✅ All fields have been validated successfully.</p>
+                ${result.status === 'matched' ? '<p style="margin: 10px 0 0 0;">The invoice has been approved for payment processing.</p>' : ''}
               </div>
               `}
               
-              <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0;">Validated Fields</h3>
-                <ul>
-                  ${matchedFields.map((m, i) => `<li>${i + 1}. ${m.field}: ✓ Validated</li>`).join('')}
-                </ul>
-              </div>
-              
-              <p style="margin-top: 30px;">Best regards,<br><strong>Automated Invoice Processing System</strong></p>
+              <p style="margin-top: 30px;">Best regards,<br><strong>Solutions Plus Team</strong></p>
             </div>
           </body>
         </html>
