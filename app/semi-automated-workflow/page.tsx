@@ -280,6 +280,48 @@ export default function SemiAutomatedWorkflow() {
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
     
+    // Save validation results to MongoDB for mongodb workflow
+    if (workflowType === 'mongodb') {
+      try {
+        const validationData = {
+          vendorName: selectedDetail.vendorName,
+          vendorEmail: (selectedDetail as any).vendorEmail || selectedDetail.vendorName,
+          invoiceId: selectedDetail.invoiceId,
+          poNumber: selectedDetail.poNumber,
+          fileName: (selectedDetail as any).fileName,
+          invoiceAmount: selectedDetail.invoiceAmount,
+          poAmount: selectedDetail.poAmount,
+          invoiceDate: selectedDetail.invoiceDate,
+          poDate: selectedDetail.poDate,
+          matchScore: selectedDetail.matchScore,
+          status: selectedDetail.status,
+          actionStatus: action === 'approve' ? 'Approved' : 'Rejected',
+          actionDate: new Date().toISOString(),
+          processedDate: selectedDetail.processedDate,
+          fieldComparisons: selectedDetail.fieldComparisons,
+          emailThreadId: (selectedDetail as any).emailThreadId,
+          workflowType: 'mongodb'
+        };
+        
+        const mongoResponse = await fetch('/api/mongodb/validations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validationData)
+        });
+        
+        const mongoResult = await mongoResponse.json();
+        
+        if (!mongoResponse.ok) {
+          console.error('Failed to save validation to MongoDB:', mongoResult.error);
+        } else {
+          console.log('Validation saved to MongoDB with ID:', mongoResult.id);
+        }
+      } catch (error) {
+        console.error('Error saving validation to MongoDB:', error);
+        // Don't block the workflow if MongoDB save fails
+      }
+    }
+    
     // Update the record's action status
     setProcessedData(prev => prev.map(r => 
       r.id === selectedDetail.id 
