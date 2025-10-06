@@ -124,7 +124,7 @@ export default function EmailAutomationCallback() {
             </>
           )}
 
-          {status === 'error' && (
+          {/* {status === 'error' && (
             <>
               <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-500 flex items-center justify-center">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,9 +134,9 @@ export default function EmailAutomationCallback() {
               <h2 className="text-2xl font-bold text-red-900 mb-2">Authorization Failed</h2>
               <p className="text-red-700">{message}</p>
             </>
-          )}
+          )} */}
 
-          <p className="text-sm text-slate-500 mt-6">This window will close automatically...</p>
+          {/* <p className="text-sm text-slate-500 mt-6">This window will close automatically...</p> */}
         </div>
       </div>
     </div>
