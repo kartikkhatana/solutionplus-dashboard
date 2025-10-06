@@ -27,8 +27,31 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
       badge: null
     },
     {
+      id: 'automated-workflow',
+      name: 'Automated Workflow',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+      path: '/automated-workflow',
+      badge: null
+    },
+    {
+      id: 'semi-automated-workflow',
+      name: 'Semi Automated Workflow',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      path: '/semi-automated-workflow',
+      badge: null
+    },
+
+    {
       id: 'workflow',
-      name: 'Integration',
+      name: 'Invoice Workflow',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -59,6 +82,7 @@ export default function Sidebar({ workflowCount = 0 }: SidebarProps = {}) {
       path: '/analytics',
       badge: null
     },
+
     {
       id: 'vendors',
       name: 'Vendors',
