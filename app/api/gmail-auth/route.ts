@@ -4,60 +4,72 @@ import { google } from 'googleapis';
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
+  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/email-automation'
 );
 
-// Define Gmail API scopes
-const SCOPES = [
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/gmail.modify',
-];
+const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
-// GET - Generate authorization URL
 export async function GET(request: NextRequest) {
-  try {
+  const searchParams = request.nextUrl.searchParams;
+  const action = searchParams.get('action');
+
+  if (action === 'authorize') {
+    // Generate authorization URL
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
-      prompt: 'consent',
+      prompt: 'consent'
     });
 
-    return NextResponse.json({
-      success: true,
-      authUrl,
-    });
-  } catch (error: any) {
-    console.error('Error generating auth URL:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to generate auth URL' },
-      { status: 500 }
-    );
+    return NextResponse.json({ authUrl });
   }
-}
 
-// POST - Exchange authorization code for tokens
-export async function POST(request: NextRequest) {
-  try {
-    const { code } = await request.json();
-
+  if (action === 'callback') {
+    const code = searchParams.get('code');
+    
     if (!code) {
-      return NextResponse.json(
-        { error: 'Authorization code required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No authorization code provided' }, { status: 400 });
     }
 
-    const { tokens } = await oauth2Client.getToken(code);
+    try {
+      const { tokens } = await oauth2Client.getToken(code);
+      oauth2Client.setCredentials(tokens);
+
+      // In production, store tokens securely (database, encrypted storage)
+      return NextResponse.json({ 
+        success: true, 
+        tokens: tokens,
+        message: 'Successfully authenticated with Gmail'
+      });
+    } catch (error) {
+      console.error('Error getting tokens:', error);
+      return NextResponse.json({ error: 'Failed to authenticate' }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { tokens } = await request.json();
     
-    return NextResponse.json({
+    if (!tokens) {
+      return NextResponse.json({ error: 'No tokens provided' }, { status: 400 });
+    }
+
+    oauth2Client.setCredentials(tokens);
+
+    // Verify tokens are valid
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    await gmail.users.getProfile({ userId: 'me' });
+
+    return NextResponse.json({ 
       success: true,
-      tokens,
+      message: 'Tokens verified successfully'
     });
-  } catch (error: any) {
-    console.error('Error exchanging code for tokens:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to exchange authorization code' },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Error verifying tokens:', error);
+    return NextResponse.json({ error: 'Invalid or expired tokens' }, { status: 401 });
   }
 }
