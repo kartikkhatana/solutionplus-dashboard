@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
           const from = headers.find((h) => h.name === 'From')?.value || 'Unknown';
           const to = headers.find((h) => h.name === 'To')?.value || 'Unknown';
           const date = headers.find((h) => h.name === 'Date')?.value || '';
+          const messageId = headers.find((h) => h.name === 'Message-ID')?.value || '';
 
           // Extract body
           let body = '';
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
           return {
             id: message.id,
             threadId: fullMessage.data.threadId,
+            messageId: messageId,
             subject,
             from,
             to,

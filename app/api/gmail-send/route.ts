@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 
 export async function POST(request: NextRequest) {
   try {
-    const { tokens, threadId, to, subject, body } = await request.json();
+    const { tokens, threadId, messageId, to, subject, body } = await request.json();
 
     if (!tokens || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
@@ -18,19 +18,32 @@ export async function POST(request: NextRequest) {
     oauth2Client.setCredentials(tokens);
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Create email message
+    // Create email message with proper reply formatting
+    let replySubject = subject;
+    if (messageId && threadId && !subject.toLowerCase().startsWith('re:')) {
+      replySubject = `Re: ${subject}`;
+    }
+
     const emailLines = [
       `To: ${to}`,
-      `Subject: ${subject}`,
+      `Subject: ${replySubject}`,
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
       '',
       body
     ];
 
-    // If threadId is provided, add it as a header for reply
-    if (threadId) {
-      emailLines.splice(3, 0, `In-Reply-To: ${threadId}`, `References: ${threadId}`);
+    // If messageId is provided, add proper reply headers for threading
+    if (messageId && threadId) {
+      console.log('Original messageId:', messageId);
+      console.log('ThreadId:', threadId);
+      // Ensure the messageId is properly formatted (should already include < >)
+      const formattedMessageId = messageId.startsWith('<') ? messageId : `<${messageId}>`;
+      console.log('Formatted messageId:', formattedMessageId);
+      
+      // Insert reply headers at the correct position (after Subject, before Content-Type)
+      emailLines.splice(2, 0, `In-Reply-To: ${formattedMessageId}`, `References: ${formattedMessageId}`);
+      console.log('Email headers with reply info:', emailLines.slice(0, 8));
     }
 
     const email = emailLines.join('\r\n');
