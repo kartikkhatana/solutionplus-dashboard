@@ -356,8 +356,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       {/* Email Workflow Content */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Email Automation Workflow</h2>
-          <p className="text-gray-600">Automated invoice processing with Gmail integration and email reporting</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Email Automation with MongoDB</h2>
+          <p className="text-gray-600">Automated invoice processing using MongoDB data with Gmail integration and vendor notifications</p>
         </div>
 
         {/* Connection Status */}
@@ -381,9 +381,9 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                 </svg>
               </motion.div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">Gmail Connection</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Gmail & Mongodb Connection</h3>
                 <p className="text-sm text-gray-600">
-                  {isConnected ? 'Connected - Ready to process emails' : 'Connect to Gmail to start automated processing'}
+                  {isConnected ? 'Connected - Ready to process emails with MongoDB validation' : 'Connect to Gmail to start automated MongoDB processing'}
                 </p>
               </div>
             </div>

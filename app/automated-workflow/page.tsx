@@ -6,8 +6,9 @@ import Sidebar from '../components/Sidebar';
 import WorkflowCard from '../components/WorkflowCard';
 import EmailWorkflow from '../components/EmailWorkflow';
 import OracleWorkflow from '../components/OracleWorkflow';
+import MongoDBEmailWorkflow from '../components/MongoDBEmailWorkflow';
 
-type WorkflowType = 'oracle' | 'email' | null;
+type WorkflowType = 'oracle' | 'email' | 'mongodb' | null;
 
 export default function AutomatedWorkflow() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowType>(null);
@@ -19,6 +20,10 @@ export default function AutomatedWorkflow() {
 
   const handleEmailWorkflow = () => {
     setSelectedWorkflow('email');
+  };
+
+  const handleMongoDBWorkflow = () => {
+    setSelectedWorkflow('mongodb');
   };
 
   const backToSelection = () => {
@@ -47,7 +52,7 @@ export default function AutomatedWorkflow() {
               transition={{ duration: 0.3 }}
             >
               {/* Workflow Selection Cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
                 {/* Oracle Fusion ERP Card */}
                 <WorkflowCard
                   icon={
@@ -75,17 +80,38 @@ export default function AutomatedWorkflow() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   }
-                  title="Email-Automation"
-                  description="Automatically process invoices from emails with intelligent extraction and validation workflows"
+                  title="Email Automation with MongoDB"
+                  description="Process invoices from emails using MongoDB data with automated validation and vendor notification workflows"
                   features={[
-                    "Auto-fetch invoices from email",
-                    "Intelligent data extraction",
+                   "Auto-fetch invoices from email",
+                    "Match against MongoDB database",
                     "Automated vendor notifications",
-                    "Seamless ERP integration"
+                    "Batch processing capabilities",
                   ]}
                   buttonText="Start Email Workflow"
                   buttonColor="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
                   onStart={handleEmailWorkflow}
+                />
+
+                {/* Email Automation with MongoDB Card */}
+                <WorkflowCard
+                  icon={
+                    <svg className="w-12 h-12 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                    </svg>
+                  }
+                  title="Email-Automation"
+                  description="Automatically process invoices from emails with intelligent extraction and validation workflows"
+                  features={[
+                     "Auto-fetch invoices from email",
+                    "Intelligent data extraction",
+                    "Automated vendor notifications",
+                    "Seamless ERP integration"
+                    
+                  ]}
+                  buttonText="Start MongoDB Workflow"
+                  buttonColor="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
+                  onStart={handleMongoDBWorkflow}
                 />
               </div>
             </motion.div>
@@ -97,6 +123,10 @@ export default function AutomatedWorkflow() {
 
           {selectedWorkflow === 'oracle' && (
             <OracleWorkflow key="oracle-workflow" onBack={backToSelection} />
+          )}
+
+          {selectedWorkflow === 'mongodb' && (
+            <MongoDBEmailWorkflow key="mongodb-workflow" onBack={backToSelection} />
           )}
         </AnimatePresence>
       </main>
