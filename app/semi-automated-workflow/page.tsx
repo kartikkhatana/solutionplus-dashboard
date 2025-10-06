@@ -246,14 +246,19 @@ export default function SemiAutomatedWorkflow() {
     // Send email via Gmail API if tokens available (for email and mongodb workflows)
     if ((workflowType === 'email' || workflowType === 'mongodb') && gmailTokens) {
       try {
+        // Use original email subject for threading, or create a new subject if not available
+        const originalSubject = (selectedDetail as any).emailOriginalSubject;
+        const emailSubject = originalSubject || `Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${selectedDetail.invoiceId}`;
+        
         const response = await fetch('/api/gmail-send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tokens: gmailTokens,
             threadId: (selectedDetail as any).emailThreadId,
+            messageId: (selectedDetail as any).emailMessageId, // Include original messageId for proper threading
             to: (selectedDetail as any).vendorEmail || selectedDetail.vendorName,
-            subject: `Re: Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${selectedDetail.invoiceId}`,
+            subject: emailSubject, // Use original subject to maintain thread
             body: emailBodyHTML
           })
         });
@@ -657,6 +662,8 @@ export default function SemiAutomatedWorkflow() {
                   actionStatus: 'Processing' as 'Processing' | 'Approved' | 'Rejected',
                   // Store email info for reply functionality
                   emailThreadId: email.threadId,
+                  emailMessageId: email.messageId, // Store original messageId for threading
+                  emailOriginalSubject: email.subject, // Store original subject for threading
                   vendorEmail: email.from.match(/<(.+)>/)?.[1] || email.from,
                   fileName: attachment.filename
                 } as any);
