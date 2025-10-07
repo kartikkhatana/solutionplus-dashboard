@@ -136,7 +136,7 @@ export default function EmailAutomationCallback() {
             </>
           )} */}
 
-          {/* <p className="text-sm text-slate-500 mt-6">This window will close automatically...</p> */}
+          <p className="text-sm text-slate-500 mt-6">This window will close automatically...</p>
         </div>
       </div>
     </div>

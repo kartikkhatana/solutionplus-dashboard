@@ -73,26 +73,6 @@ export default function AutomatedWorkflow() {
                   onStart={handleOracleWorkflow}
                 />
 
-                {/* Email Automation Card */}
-                <WorkflowCard
-                  icon={
-                    <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  }
-                  title="Email Automation with MongoDB"
-                  description="Process invoices from emails using MongoDB data with automated validation and vendor notification workflows"
-                  features={[
-                   "Auto-fetch invoices from email",
-                    "Match against MongoDB database",
-                    "Automated vendor notifications",
-                    "Batch processing capabilities",
-                  ]}
-                  buttonText="Start Email Workflow"
-                  buttonColor="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-                  onStart={handleEmailWorkflow}
-                />
-
                 {/* Email Automation with MongoDB Card */}
                 <WorkflowCard
                   icon={
@@ -109,9 +89,30 @@ export default function AutomatedWorkflow() {
                     "Seamless ERP integration"
                     
                   ]}
-                  buttonText="Start MongoDB Workflow"
+                  buttonText="Start Email Workflow"
                   buttonColor="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
                   onStart={handleMongoDBWorkflow}
+                />
+
+
+                {/* Email Automation Card */}
+                <WorkflowCard
+                  icon={
+                    <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  }
+                  title="Email Automation with MongoDB"
+                  description="Process invoices from emails using MongoDB data with automated validation and vendor notification workflows"
+                  features={[
+                   "Auto-fetch invoices from email",
+                    "Match against MongoDB database",
+                    "Automated vendor notifications",
+                    "Batch processing capabilities",
+                  ]}
+                  buttonText="Start Email with MongoDB Workflow"
+                  buttonColor="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+                  onStart={handleEmailWorkflow}
                 />
               </div>
             </motion.div>
