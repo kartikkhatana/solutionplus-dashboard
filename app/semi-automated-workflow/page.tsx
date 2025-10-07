@@ -1034,20 +1034,26 @@ Invoice Processing Team
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 text-center mb-3">MongoDB Email Automation</h3>
                 <p className="text-slate-600 text-center mb-6">
-                  Process invoices stored in MongoDB with automated validation and vendor notification workflows
+                  Process invoices from emails using MongoDB data with automated validation and vendor notification workflows
                 </p>
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-slate-700">
                     <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>Connect to MongoDB database</span>
+                    <span>Auto-fetch invoices from email</span>
                   </div>
                   <div className="flex items-center text-sm text-slate-700">
                     <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>Query stored email invoices</span>
+                    <span>Match against MongoDB database</span>
+                  </div>
+                  <div className="flex items-center text-sm text-slate-700">
+                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Automated vendor notifications</span>
                   </div>
                   <div className="flex items-center text-sm text-slate-700">
                     <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1055,16 +1061,10 @@ Invoice Processing Team
                     </svg>
                     <span>Batch processing capabilities</span>
                   </div>
-                  <div className="flex items-center text-sm text-slate-700">
-                    <svg className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Historical data analysis</span>
-                  </div>
                 </div>
                 <div className="mt-8 text-center">
                   <button className="px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all shadow-lg">
-                    Start MongoDB Workflow
+                    Start Email with MongoDB Workflow
                   </button>
                 </div>
               </div>
@@ -1179,15 +1179,15 @@ Invoice Processing Team
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
                   {extractedData.map((record) => (
-                    <tr key={record.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <input type="checkbox" checked={selectedRecords.has(record.id)} onChange={() => toggleSelection(record.id)} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{record.vendorName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.invoiceId}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.poNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 text-right">${record.invoiceAmount.toLocaleString()}</td>
-                    </tr>
+                  <tr key={record.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <input type="checkbox" checked={selectedRecords.has(record.id)} onChange={() => toggleSelection(record.id)} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900 break-words max-w-xs">{record.vendorName}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-xs">{record.invoiceId}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-xs">{record.poNumber}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-slate-900 text-right whitespace-nowrap">${record.invoiceAmount.toLocaleString()}</td>
+                  </tr>
                   ))}
                 </tbody>
               </table>
@@ -1224,23 +1224,23 @@ Invoice Processing Team
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
                   {emails.map((email) => (
-                    <tr key={email.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <input type="checkbox" checked={selectedEmails.has(email.id)} onChange={() => toggleEmailSelection(email.id)} className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{email.from}</td>
-                      <td className="px-6 py-4 text-sm text-slate-600 max-w-md truncate">{email.subject}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{email.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                          </svg>
-                          <span className="text-sm font-bold text-slate-900">{email.attachments.length} PDF{email.attachments.length > 1 ? 's' : ''}</span>
-                          <span className="text-xs text-slate-500">({email.attachments.map((a: any) => a.filename).join(', ')})</span>
-                        </div>
-                      </td>
-                    </tr>
+                  <tr key={email.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <input type="checkbox" checked={selectedEmails.has(email.id)} onChange={() => toggleEmailSelection(email.id)} className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900 break-words max-w-xs">{email.from}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-md">{email.subject}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-xs">{email.date}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        <span className="text-sm font-bold text-slate-900 whitespace-nowrap">{email.attachments.length} PDF{email.attachments.length > 1 ? 's' : ''}</span>
+                        <span className="text-xs text-slate-500 break-words">({email.attachments.map((a: any) => a.filename).join(', ')})</span>
+                      </div>
+                    </td>
+                  </tr>
                   ))}
                 </tbody>
               </table>
@@ -1397,55 +1397,55 @@ Invoice Processing Team
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200">
                   {processedData.map((record) => (
-                    <tr key={record.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        {record.actionStatus === 'Processing' ? (
-                          <input 
-                            type="checkbox" 
-                            checked={selectedResults.has(record.id)} 
-                            onChange={() => toggleResultSelection(record.id)}
-                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
-                          />
-                        ) : (
-                          <div className="w-5 h-5 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                            </svg>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{record.vendorName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.invoiceId}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{record.poNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`font-bold ${record.status === 'matched' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {record.matchScore}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(record.status)}`}>
-                          {record.status === 'matched' ? 'Matched' : 'Review Required'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                          record.actionStatus === 'Approved' 
-                            ? 'bg-green-100 text-green-700' 
-                            : record.actionStatus === 'Rejected'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {record.actionStatus || 'Processing'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => { setSelectedDetail(record); setShowDetailModal(true); }}
-                          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg">
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
+                  <tr key={record.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      {record.actionStatus === 'Processing' ? (
+                        <input 
+                          type="checkbox" 
+                          checked={selectedResults.has(record.id)} 
+                          onChange={() => toggleResultSelection(record.id)}
+                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                        />
+                      ) : (
+                        <div className="w-5 h-5 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900 break-words max-w-xs">{record.vendorName}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-xs">{record.invoiceId}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600 break-words max-w-xs">{record.poNumber}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`font-bold ${record.status === 'matched' ? 'text-green-600' : 'text-yellow-600'}`}>
+                        {record.matchScore}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(record.status)}`}>
+                        {record.status === 'matched' ? 'Matched' : 'Review Required'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                        record.actionStatus === 'Approved' 
+                          ? 'bg-green-100 text-green-700' 
+                          : record.actionStatus === 'Rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {record.actionStatus || 'Processing'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => { setSelectedDetail(record); setShowDetailModal(true); }}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg">
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
                   ))}
                 </tbody>
               </table>
