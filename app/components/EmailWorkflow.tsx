@@ -78,7 +78,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     // Listen for Gmail auth messages
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      
+
       if (event.data.type === 'GMAIL_AUTH_SUCCESS') {
         setTokens(event.data.tokens);
         setIsConnected(true);
@@ -103,18 +103,18 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
   // Email Workflow Functions
   const connectGmail = async () => {
     setConnecting(true);
-    
+
     try {
       const response = await fetch('/api/gmail-auth?action=authorize');
       const data = await response.json();
-      
+
       if (data.authUrl) {
         const popup = window.open(
           data.authUrl,
           'gmail-auth',
           'width=500,height=600,scrollbars=yes,resizable=yes'
         );
-        
+
         if (!popup) {
           throw new Error('Popup blocked. Please allow popups for this site.');
         }
@@ -127,12 +127,12 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
   const startWorkflow = async () => {
     if (!tokens) return;
-    
+
     setIsProcessing(true);
     setShowResults(false);
     setSummary(null);
     setResults([]);
-    
+
     try {
       await executeWorkflowSteps();
     } catch (error: any) {
@@ -150,13 +150,13 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
   const executeWorkflowSteps = async () => {
     let currentData: any = {};
-    
+
     // Step 1: Connect to Gmail
     const step1Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 1
       })
@@ -164,7 +164,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step1Data = await step1Response.json();
     if (!step1Data.success) throw new Error(step1Data.error);
-    
+
     setSteps(step1Data.steps);
     await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -172,8 +172,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     const step2Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 2
       })
@@ -181,7 +181,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step2Data = await step2Response.json();
     if (!step2Data.success) throw new Error(step2Data.error);
-    
+
     setSteps(step2Data.steps);
     currentData.emailsData = step2Data.emailsData;
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -190,8 +190,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     const step3Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 3,
         emailsData: currentData.emailsData
@@ -200,7 +200,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step3Data = await step3Response.json();
     if (!step3Data.success) throw new Error(step3Data.error);
-    
+
     setSteps(step3Data.steps);
     currentData.processedEmails = step3Data.processedEmails;
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -209,8 +209,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     const step4Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 4,
         processedEmails: currentData.processedEmails
@@ -219,7 +219,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step4Data = await step4Response.json();
     if (!step4Data.success) throw new Error(step4Data.error);
-    
+
     setSteps(step4Data.steps);
     await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -227,8 +227,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     const step5Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 5,
         processedEmails: currentData.processedEmails
@@ -237,7 +237,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step5Data = await step5Response.json();
     if (!step5Data.success) throw new Error(step5Data.error);
-    
+
     setSteps(step5Data.steps);
     currentData.analysisResults = step5Data.analysisResults;
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -246,8 +246,8 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
     const step6Response = await fetch('/api/automated-workflow/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        tokens, 
+      body: JSON.stringify({
+        tokens,
         senderEmail: 'pintu.sharma@us.inc',
         step: 6,
         analysisResults: currentData.analysisResults
@@ -256,7 +256,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
 
     const step6Data = await step6Response.json();
     if (!step6Data.success) throw new Error(step6Data.error);
-    
+
     setSteps(step6Data.steps);
     setSummary(step6Data.summary);
     setResults(step6Data.results || []);
@@ -266,14 +266,14 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
   // Helper functions for step visualization
   const getStepIcon = (step: WorkflowStep) => {
     const iconClass = "w-8 h-8";
-    
+
     switch (step.status) {
       case 'completed':
         return (
-          <motion.svg 
-            className={`${iconClass} text-white`} 
-            fill="none" 
-            stroke="currentColor" 
+          <motion.svg
+            className={`${iconClass} text-white`}
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -284,9 +284,9 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
         );
       case 'processing':
         return (
-          <motion.svg 
-            className={`${iconClass} text-white`} 
-            fill="none" 
+          <motion.svg
+            className={`${iconClass} text-white`}
+            fill="none"
             viewBox="0 0 24 24"
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -297,10 +297,10 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
         );
       case 'error':
         return (
-          <motion.svg 
-            className={`${iconClass} text-white`} 
-            fill="none" 
-            stroke="currentColor" 
+          <motion.svg
+            className={`${iconClass} text-white`}
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -361,7 +361,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
         </div>
 
         {/* Connection Status */}
-        <motion.div 
+        <motion.div
           className="mb-8 p-6 rounded-xl border border-gray-200 bg-gray-50"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -369,10 +369,9 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <motion.div 
-                className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  isConnected ? 'bg-green-100' : 'bg-gray-200'
-                }`}
+              <motion.div
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${isConnected ? 'bg-green-100' : 'bg-gray-200'
+                  }`}
                 animate={connecting ? { scale: [1, 1.1, 1] } : {}}
                 transition={{ duration: 1, repeat: connecting ? Infinity : 0 }}
               >
@@ -387,7 +386,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex space-x-3">
               {!isConnected ? (
                 <motion.button
@@ -430,43 +429,43 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
             <AnimatePresence>
               {steps.map((step, index) => (
                 <motion.div
-                key={step.step}
-                className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex items-center space-x-4 mb-4">
-                  <motion.div 
-                    className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-r ${getStepColor(step.status)} shadow-lg`}
-                    animate={step.status === 'processing' ? { boxShadow: ['0 0 0 0 rgba(59, 130, 246, 0.7)', '0 0 0 10px rgba(59, 130, 246, 0)', '0 0 0 0 rgba(59, 130, 246, 0)'] } : {}}
-                    transition={{ duration: 2, repeat: step.status === 'processing' ? Infinity : 0 }}
-                  >
-                    {getStepIcon(step)}
-                  </motion.div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800">{step.title}</h3>
-                    <p className="text-sm text-gray-600">{step.message}</p>
+                  key={step.step}
+                  className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex items-center space-x-4 mb-4">
+                    <motion.div
+                      className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-r ${getStepColor(step.status)} shadow-lg`}
+                      animate={step.status === 'processing' ? { boxShadow: ['0 0 0 0 rgba(59, 130, 246, 0.7)', '0 0 0 10px rgba(59, 130, 246, 0)', '0 0 0 0 rgba(59, 130, 246, 0)'] } : {}}
+                      transition={{ duration: 2, repeat: step.status === 'processing' ? Infinity : 0 }}
+                    >
+                      {getStepIcon(step)}
+                    </motion.div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-800">{step.title}</h3>
+                      <p className="text-sm text-gray-600">{step.message}</p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <motion.div
-                    className={`h-2 rounded-full bg-gradient-to-r ${getStepColor(step.status)}`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${step.progress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>{step.progress}%</span>
-                  {step.timestamp && (
-                    <span>{new Date(step.timestamp).toLocaleTimeString()}</span>
-                  )}
-                </div>
-              </motion.div>
+                  {/* Progress Bar */}
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <motion.div
+                      className={`h-2 rounded-full bg-gradient-to-r ${getStepColor(step.status)}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${step.progress}%` }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>{step.progress}%</span>
+                    {step.timestamp && (
+                      <span>{new Date(step.timestamp).toLocaleTimeString()}</span>
+                    )}
+                  </div>
+                </motion.div>
               ))}
             </AnimatePresence>
           </div>
@@ -540,11 +539,10 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                             <p className="text-xs text-gray-500">Processed: {new Date(result.analysisResult.processedAt).toLocaleString()}</p>
                           </div>
                           <div className="flex items-center space-x-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              result.analysisResult.status === 'Validated' 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-yellow-100 text-yellow-700'
-                            }`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${result.analysisResult.status === 'Validated'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                              }`}>
                               {result.analysisResult.status}
                             </span>
                             <span className="text-lg font-bold text-gray-800">{result.analysisResult.overallScore}%</span>
@@ -601,21 +599,19 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-lg font-semibold text-gray-800">Overall Score</h4>
-                      <span className={`px-4 py-2 rounded-lg font-bold text-lg ${
-                        selectedResult.analysisResult.overallScore >= 85 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
+                      <span className={`px-4 py-2 rounded-lg font-bold text-lg ${selectedResult.analysisResult.overallScore >= 85
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                        }`}>
                         {selectedResult.analysisResult.overallScore}%
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
                       <div
-                        className={`h-3 rounded-full ${
-                          selectedResult.analysisResult.overallScore >= 85 
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-400' 
-                            : 'bg-gradient-to-r from-yellow-500 to-orange-400'
-                        }`}
+                        className={`h-3 rounded-full ${selectedResult.analysisResult.overallScore >= 85
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                          : 'bg-gradient-to-r from-yellow-500 to-orange-400'
+                          }`}
                         style={{ width: `${selectedResult.analysisResult.overallScore}%` }}
                       />
                     </div>
@@ -627,22 +623,20 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
                     {Object.entries(selectedResult.analysisResult.validationPoints).map(([key, value]: [string, any]) => (
                       <div
                         key={key}
-                        className={`p-4 rounded-lg border ${
-                          value.passed 
-                            ? 'bg-green-50 border-green-200' 
-                            : 'bg-red-50 border-red-200'
-                        }`}
+                        className={`p-4 rounded-lg border ${value.passed
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-gray-800 font-medium capitalize">
                             {key.replace(/([A-Z])/g, ' $1').trim()}
                           </span>
                           <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              value.passed 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-red-100 text-red-700'
-                            }`}>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${value.passed
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                              }`}>
                               {value.passed ? 'PASS' : 'FAIL'}
                             </span>
                             <span className="text-gray-800 font-bold">{value.score}%</span>
