@@ -820,54 +820,200 @@ export default function SemiAutomatedWorkflow() {
   const handleBulkAction = async (action: 'approve' | 'reject') => {
     const selectedRecords = processedData.filter(r => selectedResults.has(r.id));
     
-    // Generate bulk email notifications
-    for (const record of selectedRecords) {
-      const mismatches = record.fieldComparisons?.filter(fc => !fc.match) || [];
-      const matchedFields = record.fieldComparisons?.filter(fc => fc.match) || [];
-      
-      const emailContent = `
-=== EMAIL NOTIFICATION ===
-To: ${record.vendorName}
-Subject: Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${record.invoiceId}
-
-Dear ${record.vendorName},
-
-Your invoice ${record.invoiceId} for PO ${record.poNumber} has been ${action === 'approve' ? 'APPROVED' : 'REJECTED'}.
-
-VALIDATION SUMMARY:
-- Match Score: ${record.matchScore}%
-- Status: ${record.status === 'matched' ? 'Fully Matched' : 'Discrepancies Found'}
-- Total Fields Validated: ${record.fieldComparisons?.length}
-- Fields Matched: ${matchedFields.length}
-- Fields Mismatched: ${mismatches.length}
-
-${mismatches.length > 0 ? `
-DISCREPANCIES FOUND:
-${mismatches.map((m, i) => `
-${i + 1}. ${m.field}:
-   - Purchase Order Value: ${m.poValue}
-   - Invoice Value: ${m.invoiceValue}
-   - Issue: Values do not match
-`).join('\n')}
-
-${action === 'reject' ? 'Please review and resubmit the corrected invoice.' : 'Despite discrepancies, this invoice has been approved for processing.'}
-` : `
-All fields have been validated successfully.
-${action === 'approve' ? 'The invoice has been approved for payment processing.' : ''}
-`}
-
-MATCHED FIELDS:
-${matchedFields.map((m, i) => `${i + 1}. ${m.field}: ✓ Validated`).join('\n')}
-
-Best regards,
-Invoice Processing Team
-      `;
-      
-      console.log(emailContent);
-    }
+    let successCount = 0;
+    let failCount = 0;
     
-    // Simulate email sending delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Process each selected record
+    for (const record of selectedRecords) {
+      try {
+        const mismatches = record.fieldComparisons?.filter(fc => !fc.match) || [];
+        
+        // Extract field comparisons for easier access
+        const poNumberComp = record.fieldComparisons?.find(f => f.field === 'PO Number');
+        const vendorNameComp = record.fieldComparisons?.find(f => f.field === 'Vendor Name');
+        const dateComp = record.fieldComparisons?.find(f => f.field === 'Date' || f.field === 'Invoice Date');
+        const amountComp = record.fieldComparisons?.find(f => f.field === 'Total Amount');
+        const currencyComp = record.fieldComparisons?.find(f => f.field === 'Currency');
+        const descriptionComp = record.fieldComparisons?.find(f => f.field === 'Description of Items');
+        const quantityComp = record.fieldComparisons?.find(f => f.field === 'Quantity');
+        
+        // Create HTML email body (same template as individual action)
+        const emailBodyHTML = `
+        <html>
+          <head>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #2c3e50; background: #f8f9fa; margin: 0; padding: 0; }
+              .container { max-width: 650px; margin: 40px auto; background: white; border: 1px solid #dee2e6; }
+              .header { padding: 30px 40px; border-bottom: 3px solid #2c3e50; }
+              .status-line { font-size: 13px; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+              .title { font-size: 24px; font-weight: 600; color: #2c3e50; margin: 0; }
+              .content { padding: 40px; }
+              .info-table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+              .info-table td { padding: 12px 0; border-bottom: 1px solid #e9ecef; }
+              .info-table td:first-child { font-weight: 600; color: #495057; width: 180px; }
+              .info-table td:last-child { color: #2c3e50; }
+              .info-table tr:last-child td { border-bottom: none; }
+              .section-title { font-size: 16px; font-weight: 600; color: #2c3e50; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #e9ecef; }
+              .footer { padding: 25px 40px; background: #f8f9fa; border-top: 1px solid #dee2e6; font-size: 13px; color: #6c757d; }
+              .score-badge { display: inline-block; padding: 6px 14px; background: #e9ecef; color: #2c3e50; font-weight: 600; font-size: 14px; border-radius: 4px; margin: 15px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="status-line">Invoice Validation Report</div>
+                <div class="title">Invoice ${action === 'approve' ? 'Approved' : 'Rejected'}</div>
+                <div class="score-badge">Match Score: ${record.matchScore || 0}%</div>
+              </div>
+              
+              <div class="content">
+                <p style="margin: 0 0 25px 0; font-size: 15px; color: #495057;">Dear ${record.vendorName},</p>
+                
+                <p style="margin: 0 0 25px 0; font-size: 15px; color: #495057;">
+                  Your invoice has been processed through our automated validation system and has been 
+                  <strong>${action === 'approve' ? 'approved' : 'rejected'}</strong> for payment processing.
+                </p>
+                
+                <div class="section-title">Invoice Details</div>
+                <table class="info-table">
+                  <tr>
+                    <td>PO Number</td>
+                    <td>${poNumberComp?.invoiceValue || record.poNumber}</td>
+                  </tr>
+                  <tr>
+                    <td>Vendor Name</td>
+                    <td>${vendorNameComp?.invoiceValue || record.vendorName}</td>
+                  </tr>
+                  <tr>
+                    <td>Date</td>
+                    <td>${dateComp?.invoiceValue || record.invoiceDate}</td>
+                  </tr>
+                  <tr>
+                    <td>Total Amount</td>
+                    <td><strong>${amountComp?.invoiceValue || `$${record.invoiceAmount.toLocaleString()}`}</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Currency</td>
+                    <td>${currencyComp?.invoiceValue || 'USD'}</td>
+                  </tr>
+                  <tr>
+                    <td>Description of Items</td>
+                    <td>${descriptionComp?.invoiceValue || 'N/A'}</td>
+                  </tr>
+                  <tr>
+                    <td>Quantity</td>
+                    <td>${quantityComp?.invoiceValue || 'N/A'}</td>
+                  </tr>
+                </table>
+              
+              ${mismatches.length > 0 ? `
+              <div class="section-title" style="color: #dc2626; border-color: #dc2626;">Fields That Did Not Match</div>
+              <table class="info-table" style="margin-bottom: 25px;">
+                <thead>
+                  <tr style="background: #fef2f2;">
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; width: 180px; border-bottom: 2px solid #e9ecef; text-align: left;">Field Name</th>
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; border-bottom: 2px solid #e9ecef; text-align: left;">Purchase Order</th>
+                    <th style="padding: 12px 12px; font-weight: 600; color: #6c757d; border-bottom: 2px solid #e9ecef; text-align: left;">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${mismatches.map(m => `
+                  <tr style="background: #fff5f5;">
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; font-weight: 600; color: #dc2626;">${m.field}</td>
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; color: #2c3e50;">${m.poValue}</td>
+                    <td style="padding: 12px 12px; border-bottom: 1px solid #fee2e2; color: #2c3e50;">${m.invoiceValue}</td>
+                  </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div style="background: #fef2f2; border-left: 3px solid #dc2626; padding: 15px; margin: 20px 0;">
+                <p style="color: #dc2626; margin: 0; font-weight: 600;">
+                  ${action === 'reject' ? '⚠️ Please review and resubmit the corrected invoice with matching values.' : '⚠️ Despite discrepancies, this invoice has been approved for processing.'}
+                </p>
+              </div>
+              ` : `
+              <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+                <p style="color: #059669; margin: 0;">✅ All fields have been validated successfully.</p>
+                ${action === 'approve' ? '<p style="margin: 10px 0 0 0;">The invoice has been approved for payment processing.</p>' : ''}
+              </div>
+              `}
+              
+              <p style="margin-top: 30px;">Best regards,<br><strong>Solutions Plus Team</strong></p>
+            </div>
+          </body>
+        </html>
+        `;
+        
+        // Send email via Gmail API if tokens available (for email and mongodb workflows)
+        if ((workflowType === 'email' || workflowType === 'mongodb') && gmailTokens) {
+          const originalSubject = (record as any).emailOriginalSubject;
+          const emailSubject = originalSubject || `Invoice ${action === 'approve' ? 'APPROVED' : 'REJECTED'} - ${record.invoiceId}`;
+          
+          const response = await fetch('/api/gmail-send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens: gmailTokens,
+              threadId: (record as any).emailThreadId,
+              messageId: (record as any).emailMessageId,
+              to: (record as any).vendorEmail || record.vendorName,
+              subject: emailSubject,
+              body: emailBodyHTML
+            })
+          });
+          
+          if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Failed to send email');
+          }
+          
+          console.log('Email sent successfully to:', (record as any).vendorEmail);
+          successCount++;
+        } else {
+          // For Oracle workflow, just log to console
+          console.log('Email notification (console output for Oracle workflow):');
+          console.log(emailBodyHTML);
+          successCount++;
+        }
+        
+        // Save validation results to MongoDB for mongodb workflow
+        if (workflowType === 'mongodb') {
+          try {
+            const validationData = {
+              vendorName: record.vendorName,
+              vendorEmail: (record as any).vendorEmail || record.vendorName,
+              invoiceId: record.invoiceId,
+              poNumber: record.poNumber,
+              fileName: (record as any).fileName,
+              invoiceAmount: record.invoiceAmount,
+              poAmount: record.poAmount,
+              invoiceDate: record.invoiceDate,
+              poDate: record.poDate,
+              matchScore: record.matchScore,
+              status: record.status,
+              actionStatus: action === 'approve' ? 'Approved' : 'Rejected',
+              actionDate: new Date().toISOString(),
+              processedDate: record.processedDate,
+              fieldComparisons: record.fieldComparisons,
+              emailThreadId: (record as any).emailThreadId,
+              workflowType: 'mongodb'
+            };
+            
+            await fetch('/api/mongodb/validations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(validationData)
+            });
+          } catch (error) {
+            console.error('Error saving validation to MongoDB:', error);
+          }
+        }
+        
+      } catch (error) {
+        console.error(`Error processing ${record.vendorName}:`, error);
+        failCount++;
+      }
+    }
     
     // Update the records' action status
     setProcessedData(prev => prev.map(r => 
@@ -876,9 +1022,14 @@ Invoice Processing Team
         : r
     ));
     
-    // Show toast notification
-    setToastType('success');
-    setToastMessage(`Bulk ${action === 'approve' ? 'approval' : 'rejection'} emails sent to ${selectedResults.size} vendor${selectedResults.size > 1 ? 's' : ''}`);
+    // Show toast notification with success/fail count
+    if (failCount === 0) {
+      setToastType('success');
+      setToastMessage(`Successfully sent ${successCount} ${action === 'approve' ? 'approval' : 'rejection'} email${successCount > 1 ? 's' : ''}`);
+    } else {
+      setToastType('error');
+      setToastMessage(`Sent ${successCount} email${successCount > 1 ? 's' : ''}, ${failCount} failed`);
+    }
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
     
@@ -1128,7 +1279,7 @@ Invoice Processing Team
                       : 'bg-gradient-to-r from-emerald-600 to-green-600'
                   }`} style={{ width: `${processingProgress}%` }} />
                 </div>
-                <p className="text-center text-slate-600 mt-2 text-sm">{processingProgress}% Complete</p>
+                <p className="text-center text-slate-600 mt-2 text-sm">{processingProgress.toFixed(2)}% Complete</p>
               </div>
             )}
 
@@ -1267,7 +1418,7 @@ Invoice Processing Team
               <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden mb-2">
                 <div className="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-blue-600 to-purple-600" style={{ width: `${processingProgress}%` }} />
               </div>
-              <p className="text-center text-slate-600 text-sm">{processingProgress}% Complete</p>
+              <p className="text-center text-slate-600 text-sm">{processingProgress.toFixed(2)}% Complete</p>
             </div>
           </div>
         )}
