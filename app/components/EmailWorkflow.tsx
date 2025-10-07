@@ -157,7 +157,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 1
       })
     });
@@ -174,7 +174,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 2
       })
     });
@@ -192,7 +192,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 3,
         emailsData: currentData.emailsData
       })
@@ -211,7 +211,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 4,
         processedEmails: currentData.processedEmails
       })
@@ -229,7 +229,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 5,
         processedEmails: currentData.processedEmails
       })
@@ -248,7 +248,7 @@ export default function EmailWorkflow({ onBack }: EmailWorkflowProps) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tokens,
-        senderEmail: 'pintu.sharma@us.inc',
+        senderEmail: '',
         step: 6,
         analysisResults: currentData.analysisResults
       })
