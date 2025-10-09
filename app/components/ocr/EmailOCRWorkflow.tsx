@@ -321,54 +321,22 @@ export default function EmailOCRWorkflow({ onBack }: EmailOCRWorkflowProps) {
             messages: [
               {
                 role: "system",
-                content: `
-You are a document classification and data extraction assistant trained for financial document analysis.
-
-### Objective:
-Given a single PDF document (either an INVOICE or a PURCHASE ORDER), determine:
-1. The document type (Invoice, PO, or Work Confirmation)
-2. Extract all key business fields relevant for invoice-to-PO matching.
-
-Output must be valid JSON with this schema:
-
-{
-  "document_type": "Invoice" | "Purchase Order" | "Work Confirmation",
-  "fields": {
-    "Supplier Name": "...",
-    "Customer Name": "...",
-    "Invoice Number": "...",
-    "PO Number": "...",
-    "Agreement Reference": "...",
-    "Date": "...",
-    "Subtotal": "...",
-    "VAT": "...",
-    "VAT Amount": "...",
-    "Total Amount": "...",
-    "Currency": "...",
-    "TRN": "...",
-    "Description": "...",
-    "Not Found Fields": ["..."]
-  }
-}
-
-If a field is missing, set it to "Not Found".
-Return **only JSON**, with no explanation.
-              `,
+                content: "Analyze this document and extract key information. Determine if it's an Invoice or Purchase Order and return structured JSON with document_type and relevant fields."
               },
               {
                 role: "user",
                 content: [
                   {
-                    "type": "text",
-                    "text": "analyze"
-                },
+                    type: "text",
+                    text: "Please analyze this document and return a JSON response with document_type (either 'Invoice' or 'Purchase Order') and extracted fields."
+                  },
                   ...imageUrlObjects,
                 ],
               },
             ],
-            temperature: 0.7,
+            temperature: 0.1,
             stream: false,
-            max_tokens: 4096,
+            max_tokens: 1000,
           };
 
           // Call USF API for classification
@@ -387,17 +355,56 @@ Return **only JSON**, with no explanation.
           const apiResponse = await response.json();
           
           let documentType: 'invoice' | 'purchase_order' = 'invoice'; // default
+          let parsedContent = null;
           
           if (apiResponse.choices && apiResponse.choices[0]?.message?.content) {
-            const content = apiResponse.choices[0].message.content.toLowerCase();
-            if (content.includes('purchase_order') || content.includes('purchase order')) {
-              documentType = 'purchase_order';
-            } else if (content.includes('invoice')) {
-              documentType = 'invoice';
+            const content = apiResponse.choices[0].message.content;
+            
+            // Extract JSON from the content
+            const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+            if (jsonMatch && jsonMatch[1]) {
+              try {
+                parsedContent = JSON.parse(jsonMatch[1]);
+                
+                // Determine document type from parsed JSON
+                if (parsedContent.document_type) {
+                  const docType = parsedContent.document_type.toLowerCase();
+                  if (docType.includes('purchase') || docType.includes('po')) {
+                    documentType = 'purchase_order';
+                  } else if (docType.includes('invoice')) {
+                    documentType = 'invoice';
+                  }
+                }
+              } catch (e) {
+                console.error("Failed to parse JSON from content:", e);
+                parsedContent = { raw_content: content };
+              }
+            } else {
+              // Try to parse the entire content as JSON
+              try {
+                parsedContent = JSON.parse(content);
+                if (parsedContent.document_type) {
+                  const docType = parsedContent.document_type.toLowerCase();
+                  if (docType.includes('purchase') || docType.includes('po')) {
+                    documentType = 'purchase_order';
+                  } else if (docType.includes('invoice')) {
+                    documentType = 'invoice';
+                  }
+                }
+              } catch (e) {
+                parsedContent = { raw_content: content };
+                // Fallback to text analysis
+                const lowerContent = content.toLowerCase();
+                if (lowerContent.includes('purchase_order') || lowerContent.includes('purchase order')) {
+                  documentType = 'purchase_order';
+                } else if (lowerContent.includes('invoice')) {
+                  documentType = 'invoice';
+                }
+              }
             }
           }
           
-          // Fallback: classify based on filename
+          // Fallback: classify based on filename if no API response
           if (!apiResponse.choices) {
             if (doc.filename.toLowerCase().includes('po') || doc.filename.toLowerCase().includes('purchase')) {
               documentType = 'purchase_order';
@@ -407,7 +414,10 @@ Return **only JSON**, with no explanation.
           classified.push({
             ...doc,
             documentType,
-            classificationResponse: apiResponse
+            classificationResponse: {
+              ...apiResponse,
+              parsedContent: parsedContent
+            }
           });
           
           toast.success(`Classified ${doc.filename} as ${documentType.replace('_', ' ')}`, { id: `classify-${doc.filename}` });
@@ -825,7 +835,14 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
               <div key={docIdx} className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
                 <h4 className="font-medium text-slate-800 mb-3">{doc.filename}</h4>
                 <pre className="text-sm text-slate-800 overflow-auto max-h-[400px] whitespace-pre-wrap">
-                  {JSON.stringify(doc.extractionResponse || doc.classificationResponse || { message: 'No data available' }, null, 2)}
+                  {JSON.stringify(
+                    doc.classificationResponse?.parsedContent || 
+                    doc.extractionResponse || 
+                    doc.classificationResponse || 
+                    { message: 'No data available' }, 
+                    null, 
+                    2
+                  )}
                 </pre>
               </div>
             ))}
