@@ -927,14 +927,42 @@ Include sections for:
                   {(() => {
                     // Extract document data - handle both nested documents array and flat structure
                     const getDocumentData = (response: any) => {
+                      // Try documents array first
                       if (response?.documents && Array.isArray(response.documents) && response.documents.length > 0) {
+                        // If multiple documents, try to find one that's not skipped
+                        const nonSkippedDoc = response.documents.find((doc: any) => !doc.skipped);
+                        if (nonSkippedDoc) return nonSkippedDoc;
+                        // Otherwise return the first one
                         return response.documents[0];
                       }
-                      return response?.extracted_data || response || {};
+                      
+                      // Try extracted_data
+                      if (response?.extracted_data && Object.keys(response.extracted_data).length > 0) {
+                        return response.extracted_data;
+                      }
+                      
+                      // Try raw_content parsed data
+                      if (response?.is_raw_response && response?.extracted_summary) {
+                        return response.extracted_summary;
+                      }
+                      
+                      // Last resort: return the response itself if it has data fields
+                      if (response && typeof response === 'object') {
+                        const hasData = Object.keys(response).some(key => 
+                          ['totals', 'parties', 'dates', 'identifiers', 'currency'].includes(key)
+                        );
+                        if (hasData) return response;
+                      }
+                      
+                      console.warn('Could not extract document data from response:', response);
+                      return {};
                     };
 
                     const invoiceDoc = getDocumentData(invoiceResult?.response);
                     const poDoc = getDocumentData(poResult?.response);
+                    
+                    console.log('Extracted Invoice Data:', invoiceDoc);
+                    console.log('Extracted PO Data:', poDoc);
 
                     // Helper to safely get nested values
                     const getValue = (obj: any, path: string) => {
@@ -1003,33 +1031,30 @@ Include sections for:
                         return String(val);
                       };
 
+                      const rowBgClass = invoiceValue !== undefined && invoiceValue !== null && poValue !== undefined && poValue !== null
+                        ? valuesMatch
+                          ? 'bg-green-50'
+                          : 'bg-red-50'
+                        : '';
+
                       return (
-                        <tr
-                          key={path}
-                          className={`hover:bg-slate-50 transition-colors ${
-                            !valuesMatch && invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null
-                              ? 'bg-red-50/20'
-                              : valuesMatch && invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null
-                              ? 'bg-green-50/20'
-                              : ''
-                          }`}
-                        >
-                          <td className="px-6 py-4">
+                        <tr key={path}>
+                          <td className={`px-6 py-4 ${rowBgClass}`}>
                             <span className="font-semibold text-slate-900">
                               {label}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className={`px-6 py-4 ${rowBgClass}`}>
                             <span className="text-sm text-slate-700 break-words">
                               {formatValue(invoiceValue)}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className={`px-6 py-4 ${rowBgClass}`}>
                             <span className="text-sm text-slate-700 break-words">
                               {formatValue(poValue)}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className={`px-6 py-4 text-center ${rowBgClass}`}>
                             {invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null ? (
                               valuesMatch ? (
                                 <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100">
@@ -1100,12 +1125,26 @@ Include sections for:
                     const { jsPDF } = await import('jspdf');
                     const autoTable = (await import('jspdf-autotable')).default;
 
-                    // Extract document data
+                    // Extract document data - use same robust logic as comparison table
                     const getDocumentData = (response: any) => {
                       if (response?.documents && Array.isArray(response.documents) && response.documents.length > 0) {
+                        const nonSkippedDoc = response.documents.find((doc: any) => !doc.skipped);
+                        if (nonSkippedDoc) return nonSkippedDoc;
                         return response.documents[0];
                       }
-                      return response?.extracted_data || response || {};
+                      if (response?.extracted_data && Object.keys(response.extracted_data).length > 0) {
+                        return response.extracted_data;
+                      }
+                      if (response?.is_raw_response && response?.extracted_summary) {
+                        return response.extracted_summary;
+                      }
+                      if (response && typeof response === 'object') {
+                        const hasData = Object.keys(response).some(key => 
+                          ['totals', 'parties', 'dates', 'identifiers', 'currency'].includes(key)
+                        );
+                        if (hasData) return response;
+                      }
+                      return {};
                     };
 
                     const invoiceDoc = getDocumentData(invoiceResult?.response);
