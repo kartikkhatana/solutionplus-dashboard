@@ -561,13 +561,8 @@ export default function OCRAutomationPage() {
   // If Manual mode is selected, show Manual Upload
   if (selectedMode === 'manual') {
     return (
-      <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0A0E27 0%, #1a1f3a 100%)' }}>
-        <Toaster position="top-right" toastOptions={{ 
-          duration: 3000, 
-          style: { background: '#1a1f3a', color: '#fff', border: '1px solid rgba(107, 70, 193, 0.3)' }, 
-          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } }, 
-          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } } 
-        }} />
+      <div className="min-h-screen bg-white">
+        <Toaster position="top-right" />
         <Sidebar />
         <div className="ml-64 p-8">
           <ManualUpload onBack={handleBack} pdfLibLoaded={pdfLibLoaded} />

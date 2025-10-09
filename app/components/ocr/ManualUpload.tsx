@@ -111,10 +111,36 @@ export default function ManualUpload({
 
       const response = await res.json();
 
-      // Store the result with images and response
+      // Extract and parse the JSON content from the LLM response
+      let parsedContent = response;
+      
+      if (response.choices && response.choices[0]?.message?.content) {
+        const content = response.choices[0].message.content;
+        
+        // Extract JSON from markdown code block if present
+        const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            parsedContent = JSON.parse(jsonMatch[1]);
+          } catch (e) {
+            console.error('Failed to parse JSON from content:', e);
+            parsedContent = { raw_content: content };
+          }
+        } else {
+          // If no JSON block found, try to parse the entire content
+          try {
+            parsedContent = JSON.parse(content);
+          } catch (e) {
+            // If parsing fails, store the raw content
+            parsedContent = { raw_content: content };
+          }
+        }
+      }
+
+      // Store the result with images and parsed response
       const result: ProcessedResult = {
         images,
-        response,
+        response: parsedContent,
         fileName,
       };
 
@@ -196,14 +222,14 @@ export default function ManualUpload({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-white">{result.fileName}</h3>
-          <div className="flex bg-white/10 rounded-lg p-1">
+          <h3 className="text-lg font-medium text-slate-900">{result.fileName}</h3>
+          <div className="flex bg-slate-100 rounded-lg p-1">
             <button
               onClick={() => setActiveTab("preview")}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === "preview"
                   ? "bg-blue-500 text-white"
-                  : "text-gray-300 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Image Preview
@@ -213,7 +239,7 @@ export default function ManualUpload({
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === "json"
                   ? "bg-blue-500 text-white"
-                  : "text-gray-300 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               JSON Response
@@ -223,20 +249,20 @@ export default function ManualUpload({
 
         {activeTab === "preview" ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-slate-600">
               {result.images.length} page(s)
             </p>
             {result.images.map((img) => (
               <div
                 key={img.pageNumber}
-                className="bg-white/5 rounded-lg p-4 border border-white/10"
+                className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm"
               >
                 <div className="mb-3">
-                  <span className="text-sm font-medium text-gray-300">
+                  <span className="text-sm font-medium text-slate-700">
                     Page {img.pageNumber}
                   </span>
                 </div>
-                <div className="rounded-lg overflow-hidden border border-white/10">
+                <div className="rounded-lg overflow-hidden border border-slate-200">
                   <img
                     src={img.base64}
                     alt={`Page ${img.pageNumber}`}
@@ -247,8 +273,8 @@ export default function ManualUpload({
             ))}
           </div>
         ) : (
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <pre className="text-sm text-gray-300 overflow-auto max-h-[600px] whitespace-pre-wrap">
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <pre className="text-sm text-slate-800 overflow-auto max-h-[600px] whitespace-pre-wrap">
               {JSON.stringify(result.response, null, 2)}
             </pre>
           </div>
@@ -261,8 +287,8 @@ export default function ManualUpload({
     <div className="max-w-7xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Manual Upload</h1>
-          <p className="text-gray-400">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Manual Upload</h1>
+          <p className="text-slate-600">
             Upload PDFs for AI-powered data extraction
           </p>
         </div>
@@ -276,9 +302,9 @@ export default function ManualUpload({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Invoice Section */}
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+        <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white">Invoice Upload</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Invoice Upload</h2>
             {invoiceResult && (
               <button
                 onClick={() => setInvoiceResult(null)}
@@ -338,9 +364,9 @@ export default function ManualUpload({
         </div>
 
         {/* Purchase Order Section */}
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+        <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-xl font-semibold text-slate-900">
               Purchase Order Upload
             </h2>
             {poResult && (
