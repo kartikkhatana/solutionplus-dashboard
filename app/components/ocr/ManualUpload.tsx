@@ -40,15 +40,7 @@ export default function ManualUpload({
   const [poActiveTab, setPOActiveTab] = useState<"preview" | "json">("preview");
   const [matchingResult, setMatchingResult] = useState<any>(null);
   const [isMatching, setIsMatching] = useState(false);
-
-  const copyResponseToClipboard = (response: any, fileName: string) => {
-    const responseText = JSON.stringify(response, null, 2);
-    navigator.clipboard.writeText(responseText).then(() => {
-      toast.success(`Copied LLM response for ${fileName}`);
-    }).catch(() => {
-      toast.error('Failed to copy response');
-    });
-  };
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const convertPDFToImages = async (file: File): Promise<ConvertedImage[]> => {
     if (!pdfjsLib) {
@@ -452,16 +444,6 @@ Include sections for:
             {result.fileName}
           </h3>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => copyResponseToClipboard(result.response, result.fileName)}
-              className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-              title="Copy LLM response"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Copy Response
-            </button>
             <div className="flex bg-slate-100 rounded-lg p-1">
             <button
               onClick={() => setActiveTab("preview")}
@@ -471,7 +453,7 @@ Include sections for:
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Image Preview
+              Image
             </button>
             <button
               onClick={() => setActiveTab("json")}
@@ -481,7 +463,7 @@ Include sections for:
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              JSON Response
+              JSON
             </button>
             </div>
           </div>
@@ -514,19 +496,13 @@ Include sections for:
           </div>
         ) : (
           <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm max-h-[600px] overflow-auto">
-            {result.response.extracted_data ? (
-              <JsonViewer data={result.response.extracted_data} />
-            ) : result.response.raw_content ? (
-              <div className="space-y-4">
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                  <pre className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono">
-                    {result.response.raw_content}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <JsonViewer data={result.response} />
-            )}
+            <pre className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono">
+              {result.response.extracted_data 
+                ? JSON.stringify(result.response.extracted_data, null, 2)
+                : result.response.raw_content 
+                ? result.response.raw_content
+                : JSON.stringify(result.response, null, 2)}
+            </pre>
           </div>
         )}
       </div>
@@ -714,222 +690,22 @@ Include sections for:
       {/* Matching Results Section */}
       {matchingResult && (
         <div id="comparison-section" className="mt-8 space-y-6">
-          {/* Header Card */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-3xl font-bold text-white mb-2">
-                  Invoice Comparison Report
-                </h2>
-                <p className="text-blue-100">AI-Powered Document Analysis</p>
-              </div>
-              <button
-                onClick={() => setMatchingResult(null)}
-                className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-              >
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                <p className="text-blue-200 text-sm mb-2">Invoice Number</p>
-                <p className="text-white text-xl font-bold">
-                  {matchingResult.invoice_number || "N/A"}
-                </p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                <p className="text-blue-200 text-sm mb-2">PO Number</p>
-                <p className="text-white text-xl font-bold">
-                  {matchingResult.purchase_order_number || "N/A"}
-                </p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                <p className="text-blue-200 text-sm mb-2">Risk Score</p>
-                <div className="flex items-center gap-2">
-                  <p
-                    className={`text-2xl font-bold ${
-                      (matchingResult.risk_score || 0) > 70
-                        ? "text-red-300"
-                        : (matchingResult.risk_score || 0) > 40
-                        ? "text-yellow-300"
-                        : "text-green-300"
-                    }`}
-                  >
-                    {matchingResult.risk_score ||
-                      matchingResult.match_score ||
-                      0}
-                    %
-                  </p>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-bold ${
-                      (matchingResult.risk_score || 0) > 70
-                        ? "bg-red-500/20 text-red-300"
-                        : (matchingResult.risk_score || 0) > 40
-                        ? "bg-yellow-500/20 text-yellow-300"
-                        : "bg-green-500/20 text-green-300"
-                    }`}
-                  >
-                    {(matchingResult.risk_score || 0) > 70
-                      ? "HIGH"
-                      : (matchingResult.risk_score || 0) > 40
-                      ? "MEDIUM"
-                      : "LOW"}
-                  </span>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                <p className="text-blue-200 text-sm mb-2">Status</p>
-                <span
-                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
-                    matchingResult.document_status === "Matched" ||
-                    matchingResult.overall_status === "matched"
-                      ? "bg-green-500 text-white"
-                      : "bg-yellow-500 text-white"
-                  }`}
-                >
-                  {matchingResult.document_status === "Matched" ||
-                  matchingResult.overall_status === "matched" ? (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  )}
-                  {matchingResult.document_status ||
-                    matchingResult.overall_status ||
-                    "Processed"}
-                </span>
-              </div>
-            </div>
-          </div>
-
+       
           {/* Side-by-Side Comparison of Invoice and PO Data */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Document Comparison</h3>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span className="text-white font-medium">Export</span>
+              </button>
             </div>
             
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Invoice Data Column */}
-                <div>
-                  <h4 className="text-lg font-semibold text-slate-900 mb-4 pb-2 border-b-2 border-blue-500">
-                    Invoice Data
-                  </h4>
-                  <div className="space-y-2">
-                    {invoiceResult?.response.extracted_data ? (
-                      Object.entries(invoiceResult.response.extracted_data).map(([key, value]: [string, any]) => (
-                        <div key={key} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                          <p className="text-xs text-blue-600 font-medium mb-1">
-                            {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </p>
-                        </div>
-                      ))
-                    ) : invoiceResult?.response ? (
-                      Object.entries(invoiceResult.response).map(([key, value]: [string, any]) => (
-                        key !== 'raw_content' && key !== 'extracted_data' && (
-                          <div key={key} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                            <p className="text-xs text-blue-600 font-medium mb-1">
-                              {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                            </p>
-                            <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </p>
-                          </div>
-                        )
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">No data available</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* PO Data Column */}
-                <div>
-                  <h4 className="text-lg font-semibold text-slate-900 mb-4 pb-2 border-b-2 border-green-500">
-                    Purchase Order Data
-                  </h4>
-                  <div className="space-y-2">
-                    {poResult?.response.extracted_data ? (
-                      Object.entries(poResult.response.extracted_data).map(([key, value]: [string, any]) => (
-                        <div key={key} className="bg-green-50 rounded-lg p-3 border border-green-200">
-                          <p className="text-xs text-green-600 font-medium mb-1">
-                            {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </p>
-                          <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </p>
-                        </div>
-                      ))
-                    ) : poResult?.response ? (
-                      Object.entries(poResult.response).map(([key, value]: [string, any]) => (
-                        key !== 'raw_content' && key !== 'extracted_data' && (
-                          <div key={key} className="bg-green-50 rounded-lg p-3 border border-green-200">
-                            <p className="text-xs text-green-600 font-medium mb-1">
-                              {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                            </p>
-                            <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </p>
-                          </div>
-                        )
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">No data available</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Field Comparison Table (only if structured data exists) */}
-          {!matchingResult.is_raw_response && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-slate-700 to-slate-600 px-6 py-4">
-                <h3 className="text-lg font-bold text-white">
-                  Field-by-Field Comparison
-                </h3>
-              </div>
-
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -949,212 +725,133 @@ Include sections for:
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {/* Matched Fields */}
-                  {matchingResult.field_level_comparison?.matched_fields &&
-                    Object.entries(
-                      matchingResult.field_level_comparison.matched_fields
-                    ).map(([key, value]: [string, any]) => (
-                      <tr
-                        key={key}
-                        className="hover:bg-green-50 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-slate-900">
-                            {key
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-slate-700">
-                            {value.invoice || value}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-slate-700">
-                            {value.po || value}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={3}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                            Match
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                  {(() => {
+                    // Extract document data - handle both nested documents array and flat structure
+                    const getDocumentData = (response: any) => {
+                      if (response?.documents && Array.isArray(response.documents) && response.documents.length > 0) {
+                        return response.documents[0];
+                      }
+                      return response?.extracted_data || response || {};
+                    };
 
-                  {/* Mismatched Fields */}
-                  {matchingResult.field_level_comparison?.mismatched_fields &&
-                    Object.entries(
-                      matchingResult.field_level_comparison.mismatched_fields
-                    ).map(([key, value]: [string, any]) => (
-                      <tr
-                        key={key}
-                        className="hover:bg-red-50 transition-colors bg-red-50/30"
-                      >
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-slate-900">
-                            {key
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-slate-700 font-medium">
-                            {Array.isArray(value.invoice)
-                              ? `${value.invoice.length} items`
-                              : value.invoice || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-slate-700 font-medium">
-                            {Array.isArray(value.po)
-                              ? `${value.po.length} items`
-                              : value.po || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={3}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                            Mismatch
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    const invoiceDoc = getDocumentData(invoiceResult?.response);
+                    const poDoc = getDocumentData(poResult?.response);
+
+                    // Helper to safely get nested values
+                    const getValue = (obj: any, path: string) => {
+                      const keys = path.split('.');
+                      let value = obj;
+                      for (const key of keys) {
+                        if (value && typeof value === 'object' && key in value) {
+                          value = value[key];
+                        } else {
+                          return undefined;
+                        }
+                      }
+                      return value;
+                    };
+
+                    // Define key fields to display
+                    const fieldsToShow = [
+                      { label: 'Document Type', path: 'document_type' },
+                      { label: 'Source ID', path: 'source_id' },
+                      { label: 'Currency', path: 'currency' },
+                      { label: 'Subtotal', path: 'totals.subtotal' },
+                      { label: 'Tax', path: 'totals.tax' },
+                      { label: 'Shipping', path: 'totals.shipping' },
+                      { label: 'Discount', path: 'totals.discount' },
+                      { label: 'Grand Total', path: 'totals.grand_total' },
+                      { label: 'Seller Name', path: 'parties.seller.name' },
+                      { label: 'Seller Tax ID', path: 'parties.seller.tax_id' },
+                      { label: 'Seller Address', path: 'parties.seller.address' },
+                      { label: 'Seller Email', path: 'parties.seller.email' },
+                      { label: 'Seller Phone', path: 'parties.seller.phone' },
+                      { label: 'Buyer Name', path: 'parties.buyer.name' },
+                      { label: 'Buyer Tax ID', path: 'parties.buyer.tax_id' },
+                      { label: 'Buyer Address', path: 'parties.buyer.address' },
+                      { label: 'Issue Date', path: 'dates.issue_date' },
+                      { label: 'Due Date', path: 'dates.due_date' },
+                      { label: 'Delivery Date', path: 'dates.delivery_date' },
+                      { label: 'Invoice Number', path: 'identifiers.invoice_number' },
+                      { label: 'PO Number', path: 'identifiers.po_number' },
+                      { label: 'Order Number', path: 'identifiers.order_number' },
+                      { label: 'Customer ID', path: 'identifiers.customer_id' },
+                      { label: 'Payment Terms', path: 'payment_terms.terms_text' },
+                      { label: 'Payment Days', path: 'payment_terms.days' },
+                    ];
+
+                    return fieldsToShow.map(({ label, path }) => {
+                      const invoiceValue = getValue(invoiceDoc, path);
+                      const poValue = getValue(poDoc, path);
+
+                      // Skip if both are null/undefined
+                      if (invoiceValue === null && poValue === null) return null;
+                      if (invoiceValue === undefined && poValue === undefined) return null;
+
+                      // Check if values match
+                      const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+
+                      const formatValue = (val: any) => {
+                        if (val === null || val === undefined) return '-';
+                        if (typeof val === 'object') return JSON.stringify(val);
+                        return String(val);
+                      };
+
+                      return (
+                        <tr
+                          key={path}
+                          className={`hover:bg-slate-50 transition-colors ${
+                            !valuesMatch && invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null
+                              ? 'bg-red-50/20'
+                              : valuesMatch && invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null
+                              ? 'bg-green-50/20'
+                              : ''
+                          }`}
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-slate-900">
+                              {label}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-slate-700 break-words">
+                              {formatValue(invoiceValue)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-slate-700 break-words">
+                              {formatValue(poValue)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null ? (
+                              valuesMatch ? (
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100">
+                                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100">
+                                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }).filter(Boolean);
+                  })()}
                 </tbody>
               </table>
             </div>
-
-            {/* Summary Stats */}
-            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-sm font-medium text-slate-700">
-                    {matchingResult.field_level_comparison?.matched_fields
-                      ? Object.keys(
-                          matchingResult.field_level_comparison.matched_fields
-                        ).length
-                      : 0}{" "}
-                    Matched
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-sm font-medium text-slate-700">
-                    {matchingResult.field_level_comparison?.mismatched_fields
-                      ? Object.keys(
-                          matchingResult.field_level_comparison
-                            .mismatched_fields
-                        ).length
-                      : 0}{" "}
-                    Mismatched
-                  </span>
-                </div>
-              </div>
-              <div className="text-sm text-slate-600">
-                Total Fields:{" "}
-                {(matchingResult.field_level_comparison?.matched_fields
-                  ? Object.keys(
-                      matchingResult.field_level_comparison.matched_fields
-                    ).length
-                  : 0) +
-                  (matchingResult.field_level_comparison?.mismatched_fields
-                    ? Object.keys(
-                        matchingResult.field_level_comparison.mismatched_fields
-                      ).length
-                    : 0)}
-              </div>
-            </div>
           </div>
-          )}
 
-          {/* Detected Anomalies */}
-          {matchingResult.detected_anomalies &&
-            matchingResult.detected_anomalies.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                  Detected Anomalies
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {matchingResult.detected_anomalies.map(
-                    (anomaly: string, idx: number) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full"
-                      >
-                        {anomaly}
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-
-          {/* Justification */}
-          {matchingResult.justification && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-              <h3 className="text-lg font-semibold text-blue-900 mb-3">
-                Analysis & Justification
-              </h3>
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {matchingResult.justification}
-              </p>
-            </div>
-          )}
-
-          {/* Confidence Scores */}
-          {matchingResult.confidence_scores && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Confidence Scores
-              </h3>
-              <div className="grid grid-cols-5 gap-4">
-                {Object.entries(matchingResult.confidence_scores).map(
-                  ([key, value]: [string, any]) => (
-                    <div
-                      key={key}
-                      className="text-center bg-slate-50 rounded-lg p-4"
-                    >
-                      <p className="text-xs text-slate-500 mb-2">
-                        {key
-                          .replace(/_/g, " ")
-                          .replace(/\b\w/g, (l) => l.toUpperCase())}
-                      </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {Math.round((value as number) * 100)}%
-                      </p>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          )}
+         
 
           {/* Raw JSON View */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
@@ -1168,6 +865,160 @@ Include sections for:
                 </pre>
               </div>
             </details>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-900">Export Options</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-3">
+              {/* Export as PDF */}
+              <button
+                onClick={() => {
+                  toast.success('PDF export coming soon!');
+                  setShowExportModal(false);
+                }}
+                className="w-full px-4 py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors flex items-center gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span className="font-medium">Export as PDF</span>
+              </button>
+
+              {/* Export as CSV */}
+              <button
+                onClick={() => {
+                  // Extract document data
+                  const getDocumentData = (response: any) => {
+                    if (response?.documents && Array.isArray(response.documents) && response.documents.length > 0) {
+                      return response.documents[0];
+                    }
+                    return response?.extracted_data || response || {};
+                  };
+
+                  const invoiceDoc = getDocumentData(invoiceResult?.response);
+                  const poDoc = getDocumentData(poResult?.response);
+
+                  const getValue = (obj: any, path: string) => {
+                    const keys = path.split('.');
+                    let value = obj;
+                    for (const key of keys) {
+                      if (value && typeof value === 'object' && key in value) {
+                        value = value[key];
+                      } else {
+                        return undefined;
+                      }
+                    }
+                    return value;
+                  };
+
+                  const fieldsToShow = [
+                    { label: 'Document Type', path: 'document_type' },
+                    { label: 'Source ID', path: 'source_id' },
+                    { label: 'Currency', path: 'currency' },
+                    { label: 'Subtotal', path: 'totals.subtotal' },
+                    { label: 'Tax', path: 'totals.tax' },
+                    { label: 'Grand Total', path: 'totals.grand_total' },
+                    { label: 'Seller Name', path: 'parties.seller.name' },
+                    { label: 'Buyer Name', path: 'parties.buyer.name' },
+                    { label: 'Issue Date', path: 'dates.issue_date' },
+                    { label: 'Invoice Number', path: 'identifiers.invoice_number' },
+                    { label: 'PO Number', path: 'identifiers.po_number' },
+                  ];
+
+                  // Create CSV content
+                  let csvContent = 'Field Name,Invoice Value,PO Value,Status\n';
+                  
+                  fieldsToShow.forEach(({ label, path }) => {
+                    const invoiceValue = getValue(invoiceDoc, path);
+                    const poValue = getValue(poDoc, path);
+                    
+                    if (invoiceValue !== null && invoiceValue !== undefined || poValue !== null && poValue !== undefined) {
+                      const formatValue = (val: any) => {
+                        if (val === null || val === undefined) return '-';
+                        if (typeof val === 'object') return JSON.stringify(val).replace(/"/g, '""');
+                        return String(val).replace(/"/g, '""');
+                      };
+                      
+                      const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                      const status = (invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null) 
+                        ? (valuesMatch ? 'Match' : 'Mismatch') 
+                        : '-';
+                      
+                      csvContent += `"${label}","${formatValue(invoiceValue)}","${formatValue(poValue)}","${status}"\n`;
+                    }
+                  });
+
+                  const blob = new Blob([csvContent], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'document-comparison.csv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('CSV exported successfully!');
+                  setShowExportModal(false);
+                }}
+                className="w-full px-4 py-3 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors flex items-center gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span className="font-medium">Export as CSV</span>
+              </button>
+
+              {/* Export as JSON */}
+              <button
+                onClick={() => {
+                  const dataToExport = {
+                    invoice: invoiceResult?.response,
+                    purchaseOrder: poResult?.response,
+                    comparison: matchingResult
+                  };
+                  const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'document-comparison.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('JSON exported successfully!');
+                  setShowExportModal(false);
+                }}
+                className="w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors flex items-center gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                <span className="font-medium">Export as JSON</span>
+              </button>
+
+              {/* REST API (Coming Soon) */}
+              <button
+                disabled
+                className="w-full px-4 py-3 bg-slate-100 text-slate-400 rounded-lg cursor-not-allowed flex items-center gap-3"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                </svg>
+                <span className="font-medium">REST API (Coming Soon)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
