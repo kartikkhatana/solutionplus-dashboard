@@ -937,8 +937,15 @@ Include sections for:
                       if (invoiceValue === null && poValue === null) return null;
                       if (invoiceValue === undefined && poValue === undefined) return null;
 
-                      // Check if values match
-                      const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                      // Check if values match (case-insensitive for strings)
+                      const valuesMatch = (() => {
+                        if (typeof invoiceValue === 'string' && typeof poValue === 'string') {
+                          // Case-insensitive comparison for strings, also trim whitespace
+                          return invoiceValue.trim().toLowerCase() === poValue.trim().toLowerCase();
+                        }
+                        // For non-string values, use regular comparison
+                        return JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                      })();
 
                       const formatValue = (val: any) => {
                         if (val === null || val === undefined) return '-';
@@ -1110,7 +1117,14 @@ Include sections for:
                           return String(val);
                         };
 
-                        const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                        // Case-insensitive comparison for strings
+                        const valuesMatch = (() => {
+                          if (typeof invoiceValue === 'string' && typeof poValue === 'string') {
+                            return invoiceValue.trim().toLowerCase() === poValue.trim().toLowerCase();
+                          }
+                          return JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                        })();
+                        
                         const status = (invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null)
                           ? (valuesMatch ? '✓ Match' : '✗ Mismatch')
                           : '-';
@@ -1279,7 +1293,14 @@ Include sections for:
                         return String(val).replace(/"/g, '""');
                       };
                       
-                      const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                      // Case-insensitive comparison for strings
+                      const valuesMatch = (() => {
+                        if (typeof invoiceValue === 'string' && typeof poValue === 'string') {
+                          return invoiceValue.trim().toLowerCase() === poValue.trim().toLowerCase();
+                        }
+                        return JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                      })();
+                      
                       const status = (invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null) 
                         ? (valuesMatch ? 'Match' : 'Mismatch') 
                         : '-';
