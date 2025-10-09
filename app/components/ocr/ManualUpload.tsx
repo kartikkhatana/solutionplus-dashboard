@@ -888,9 +888,170 @@ Include sections for:
             <div className="p-6 space-y-3">
               {/* Export as PDF */}
               <button
-                onClick={() => {
-                  toast.success('PDF export coming soon!');
-                  setShowExportModal(false);
+                onClick={async () => {
+                  try {
+                    // Dynamically import jsPDF and autoTable
+                    const { jsPDF } = await import('jspdf');
+                    const autoTable = (await import('jspdf-autotable')).default;
+
+                    // Extract document data
+                    const getDocumentData = (response: any) => {
+                      if (response?.documents && Array.isArray(response.documents) && response.documents.length > 0) {
+                        return response.documents[0];
+                      }
+                      return response?.extracted_data || response || {};
+                    };
+
+                    const invoiceDoc = getDocumentData(invoiceResult?.response);
+                    const poDoc = getDocumentData(poResult?.response);
+
+                    const getValue = (obj: any, path: string) => {
+                      const keys = path.split('.');
+                      let value = obj;
+                      for (const key of keys) {
+                        if (value && typeof value === 'object' && key in value) {
+                          value = value[key];
+                        } else {
+                          return undefined;
+                        }
+                      }
+                      return value;
+                    };
+
+                    const fieldsToShow = [
+                      { label: 'Document Type', path: 'document_type' },
+                      { label: 'Source ID', path: 'source_id' },
+                      { label: 'Currency', path: 'currency' },
+                      { label: 'Subtotal', path: 'totals.subtotal' },
+                      { label: 'Tax', path: 'totals.tax' },
+                      { label: 'Shipping', path: 'totals.shipping' },
+                      { label: 'Discount', path: 'totals.discount' },
+                      { label: 'Grand Total', path: 'totals.grand_total' },
+                      { label: 'Seller Name', path: 'parties.seller.name' },
+                      { label: 'Seller Tax ID', path: 'parties.seller.tax_id' },
+                      { label: 'Seller Address', path: 'parties.seller.address' },
+                      { label: 'Seller Email', path: 'parties.seller.email' },
+                      { label: 'Seller Phone', path: 'parties.seller.phone' },
+                      { label: 'Buyer Name', path: 'parties.buyer.name' },
+                      { label: 'Buyer Tax ID', path: 'parties.buyer.tax_id' },
+                      { label: 'Buyer Address', path: 'parties.buyer.address' },
+                      { label: 'Issue Date', path: 'dates.issue_date' },
+                      { label: 'Due Date', path: 'dates.due_date' },
+                      { label: 'Delivery Date', path: 'dates.delivery_date' },
+                      { label: 'Invoice Number', path: 'identifiers.invoice_number' },
+                      { label: 'PO Number', path: 'identifiers.po_number' },
+                      { label: 'Order Number', path: 'identifiers.order_number' },
+                      { label: 'Customer ID', path: 'identifiers.customer_id' },
+                      { label: 'Payment Terms', path: 'payment_terms.terms_text' },
+                      { label: 'Payment Days', path: 'payment_terms.days' },
+                    ];
+
+                    // Prepare table data
+                    const tableData: string[][] = fieldsToShow
+                      .map(({ label, path }) => {
+                        const invoiceValue = getValue(invoiceDoc, path);
+                        const poValue = getValue(poDoc, path);
+
+                        if (invoiceValue === null && poValue === null) return null;
+                        if (invoiceValue === undefined && poValue === undefined) return null;
+
+                        const formatValue = (val: any) => {
+                          if (val === null || val === undefined) return '-';
+                          if (typeof val === 'object') return JSON.stringify(val);
+                          return String(val);
+                        };
+
+                        const valuesMatch = JSON.stringify(invoiceValue) === JSON.stringify(poValue);
+                        const status = (invoiceValue !== undefined && poValue !== undefined && invoiceValue !== null && poValue !== null)
+                          ? (valuesMatch ? '✓ Match' : '✗ Mismatch')
+                          : '-';
+
+                        return [
+                          label,
+                          formatValue(invoiceValue),
+                          formatValue(poValue),
+                          status
+                        ];
+                      })
+                      .filter((row): row is string[] => row !== null);
+
+                    // Create PDF
+                    const doc = new jsPDF({
+                      orientation: 'landscape',
+                      unit: 'mm',
+                      format: 'a4'
+                    });
+
+                    // Add title
+                    doc.setFontSize(18);
+                    doc.setTextColor(79, 70, 229); // Indigo color
+                    doc.text('Document Comparison Report', 14, 15);
+
+                    // Add date
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+                    // Add table using autoTable
+                    autoTable(doc, {
+                      head: [['Field Name', 'Invoice Value', 'PO Value', 'Status']],
+                      body: tableData,
+                      startY: 28,
+                      theme: 'grid',
+                      headStyles: {
+                        fillColor: [79, 70, 229], // Indigo
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        fontSize: 10
+                      },
+                      styles: {
+                        fontSize: 9,
+                        cellPadding: 3,
+                        overflow: 'linebreak',
+                        cellWidth: 'wrap'
+                      },
+                      columnStyles: {
+                        0: { cellWidth: 50, fontStyle: 'bold' },
+                        1: { cellWidth: 70 },
+                        2: { cellWidth: 70 },
+                        3: { cellWidth: 30, halign: 'center' }
+                      },
+                      didParseCell: function(data: any) {
+                        // Color code status column
+                        if (data.column.index === 3 && data.section === 'body') {
+                          if (data.cell.text[0].includes('✓')) {
+                            data.cell.styles.textColor = [22, 163, 74]; // Green
+                            data.cell.styles.fillColor = [240, 253, 244]; // Light green
+                          } else if (data.cell.text[0].includes('✗')) {
+                            data.cell.styles.textColor = [220, 38, 38]; // Red
+                            data.cell.styles.fillColor = [254, 242, 242]; // Light red
+                          }
+                        }
+                      }
+                    });
+
+                    // Add footer
+                    const pageCount = doc.internal.pages.length - 1;
+                    for (let i = 1; i <= pageCount; i++) {
+                      doc.setPage(i);
+                      doc.setFontSize(8);
+                      doc.setTextColor(150, 150, 150);
+                      doc.text(
+                        `Page ${i} of ${pageCount}`,
+                        doc.internal.pageSize.getWidth() / 2,
+                        doc.internal.pageSize.getHeight() - 10,
+                        { align: 'center' }
+                      );
+                    }
+
+                    // Save PDF
+                    doc.save('document-comparison.pdf');
+                    toast.success('PDF exported successfully!');
+                    setShowExportModal(false);
+                  } catch (error) {
+                    console.error('PDF export error:', error);
+                    toast.error('Failed to export PDF');
+                  }
                 }}
                 className="w-full px-4 py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors flex items-center gap-3"
               >
@@ -1014,7 +1175,7 @@ Include sections for:
                 className="w-full px-4 py-3 bg-slate-100 text-slate-400 rounded-lg cursor-not-allowed flex items-center gap-3"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                 </svg>
                 <span className="font-medium">REST API (Coming Soon)</span>
               </button>
