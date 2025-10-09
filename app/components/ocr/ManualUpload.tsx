@@ -95,11 +95,14 @@ export default function ManualUpload({
               text: `
                 You are an intelligent document data extraction and classification system. You will receive MULTIPLE images. For each image, your task is to:
 
-**IMPORTANT CONTEXT: This document was uploaded by the user in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" upload section. This is a strong indicator of the document type.**
+**MANDATORY CLASSIFICATION RULE:**
+The user uploaded this document in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" upload section.
+You MUST classify this document as "${type === "invoice" ? "invoice" : "purchase_order"}" in the document_type field.
+DO NOT override this classification unless the document is completely blank, corrupted, or contains no financial data at all.
+The user knows what type of document they are uploading - trust their judgment.
 
 1) DETECTION & CLASSIFICATION
-- Identify whether the image contains an INVOICE or a PURCHASE ORDER (PO).
-- CRITICAL: The user uploaded this in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" section, so unless there is overwhelming evidence to the contrary, classify it as "${type === "invoice" ? "invoice" : "purchase_order"}".
+- You MUST set document_type to "${type === "invoice" ? "invoice" : "purchase_order"}" because that is what the user indicated by uploading it in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" section.
 - If neither applies, mark it as {"document_type": "none", "skipped": true, "reason": "No invoice or purchase order detected"}.
 - If both types appear, select the dominant type (the document's main purpose).
 - Only include images that contain invoice or purchase order data fields (e.g., totals, line items, billing details, references, parties, or identifiable financial structure).
@@ -299,6 +302,26 @@ Return ONLY this JSON structure.
             };
           }
         }
+      }
+
+      // POST-PROCESSING: Force the document_type based on upload section
+      // This ensures the classification always matches the user's intent
+      const correctDocumentType = type === "invoice" ? "invoice" : "purchase_order";
+      
+      if (parsedContent.documents && Array.isArray(parsedContent.documents)) {
+        // Update all documents in the array
+        parsedContent.documents = parsedContent.documents.map((doc: any) => ({
+          ...doc,
+          document_type: correctDocumentType
+        }));
+        console.log(`Forced document_type to "${correctDocumentType}" based on upload section`);
+      } else if (parsedContent.extracted_data) {
+        // Update extracted_data if present
+        parsedContent.extracted_data = {
+          ...parsedContent.extracted_data,
+          document_type: correctDocumentType
+        };
+        console.log(`Forced document_type to "${correctDocumentType}" in extracted_data`);
       }
 
       // Store the result with images and parsed response
