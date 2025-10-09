@@ -128,18 +128,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert map back to array and filter to keep only threads where the latest email has attachments
+    // Convert map back to array and filter to keep only threads where the latest email has 2 or more PDF attachments
     const latestEmailsPerThread = Array.from(threadMap.values())
+      .map(email => {
+        // Filter to keep only PDF attachments first
+        if (email.attachments) {
+          email.attachments = email.attachments.filter((att: any) => 
+            att.filename && att.filename.toLowerCase().endsWith('.pdf')
+          );
+        }
+        return email;
+      })
       .filter(email => {
-        // Only keep if the latest email has attachments
-        return email.attachments && email.attachments.length > 0;
+        // Only keep emails that have 2 or more PDF attachments
+        return email.attachments && email.attachments.length >= 2;
       })
       .map(email => {
-        // If email has multiple attachments, keep only the latest one (last in array)
-        if (email.attachments && email.attachments.length > 1) {
-          email.attachments = [email.attachments[email.attachments.length - 1]];
-        }
-        
         // Remove internalDate from response as it's only needed for sorting
         const { internalDate, ...emailWithoutInternalDate } = email;
         return emailWithoutInternalDate;
