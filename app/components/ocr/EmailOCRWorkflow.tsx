@@ -321,14 +321,14 @@ export default function EmailOCRWorkflow({ onBack }: EmailOCRWorkflowProps) {
             messages: [
               {
                 role: "system",
-                content: "Analyze this document and extract key information. Determine if it's an Invoice or Purchase Order and return structured JSON with document_type and relevant fields."
+                content: "Please analyze this document and return a JSON response with document_type (either 'Invoice' or 'Purchase Order') and extracted fields."
               },
               {
                 role: "user",
                 content: [
                   {
                     type: "text",
-                    text: "Please analyze this document and return a JSON response with document_type (either 'Invoice' or 'Purchase Order') and extracted fields."
+                    text: "analyze"
                   },
                   ...imageUrlObjects,
                 ],
@@ -462,105 +462,8 @@ export default function EmailOCRWorkflow({ onBack }: EmailOCRWorkflowProps) {
     }
   };
 
-  // Extract data from documents (like Manual workflow)
-  const extractDocumentData = async (documents: ProcessedDocument[], type: 'invoice' | 'purchase_order') => {
-    const extracted: ProcessedDocument[] = [];
-    
-    for (const doc of documents) {
-      try {
-        const imageUrlObjects = doc.images.map((img) => ({
-          type: "image_url",
-          image_url: { url: img.base64 },
-        }));
 
-        const payload = {
-          model: "usf-mini",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `You are an intelligent document-processing assistant trained to analyze multiple image inputs.
-Review each image carefully and identify whether it contains an ${type === 'invoice' ? 'invoice' : 'purchase order'}.
-
-If it does, extract all relevant structured fields (vendor, ${type === 'invoice' ? 'invoice' : 'PO'} number, date, amount, item details, taxes, totals, etc.).
-
-If an image does not contain relevant financial data, exclude it from analysis.
-Maintain consistent output formatting and indicate skipped images clearly if necessary.
-Ensure numerical accuracy and preserve formatting for dates and currency.`,
-                },
-                ...imageUrlObjects,
-                {
-                  type: "text",
-                  text: "Provide structured data extraction including vendor name, amount, date, items, and other relevant fields",
-                },
-              ],
-            },
-          ],
-          temperature: 0.7,
-          stream: false,
-          max_tokens: 2048,
-        };
-
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL}/usf/v1/chat/completions`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "",
-            },
-            body: JSON.stringify(payload),
-          }
-        );
-
-        const apiResponse = await response.json();
-
-        // Extract and parse the JSON content from the LLM response
-        let parsedContent = apiResponse;
-
-        if (apiResponse.choices && apiResponse.choices[0]?.message?.content) {
-          const content = apiResponse.choices[0].message.content;
-
-          // Extract JSON from markdown code block if present
-          const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-          if (jsonMatch && jsonMatch[1]) {
-            try {
-              parsedContent = JSON.parse(jsonMatch[1]);
-            } catch (e) {
-              console.error("Failed to parse JSON from content:", e);
-              parsedContent = { raw_content: content };
-            }
-          } else {
-            // If no JSON block found, try to parse the entire content
-            try {
-              parsedContent = JSON.parse(content);
-            } catch (e) {
-              // If parsing fails, store the raw content
-              parsedContent = { raw_content: content };
-            }
-          }
-        }
-
-        extracted.push({
-          ...doc,
-          extractionResponse: parsedContent
-        });
-
-      } catch (error) {
-        console.error(`Extraction error for ${doc.filename}:`, error);
-        extracted.push({
-          ...doc,
-          extractionResponse: { error: 'Extraction failed', raw_error: String(error) }
-        });
-      }
-    }
-    
-    return extracted;
-  };
-
-  // Enhanced Comparison Matrix - Compare every invoice with every PO
+  // Enhanced Comparison Matrix - Compare using extracted JSON data only (no more base64)
   const handleProceedToMatch = async () => {
     if (invoiceDocuments.length === 0 || poDocuments.length === 0) {
       toast.error('Need both invoice and PO documents to proceed');
@@ -573,38 +476,26 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
 
     try {
       const totalComparisons = invoiceDocuments.length * poDocuments.length;
-      toast.loading(`Performing ${totalComparisons} comparison(s)...`, { id: "matching" });
+      toast.loading(`Performing ${totalComparisons} comparison(s) using extracted JSON data...`, { id: "matching" });
 
-      // Extract data from both document types first
-      const extractedInvoices = await extractDocumentData(invoiceDocuments, 'invoice');
-      const extractedPOs = await extractDocumentData(poDocuments, 'purchase_order');
-
-      // Comparison Matrix: Compare every invoice with every PO
+      // Comparison Matrix: Compare every invoice with every PO using their parsed JSON data
       const comparisonResults = [];
       let completedComparisons = 0;
 
-      for (let i = 0; i < extractedInvoices.length; i++) {
-        const invoice = extractedInvoices[i];
+      for (let i = 0; i < invoiceDocuments.length; i++) {
+        const invoice = invoiceDocuments[i];
         
-        for (let j = 0; j < extractedPOs.length; j++) {
-          const po = extractedPOs[j];
+        for (let j = 0; j < poDocuments.length; j++) {
+          const po = poDocuments[j];
           
           try {
             toast.loading(`Comparing ${invoice.filename} with ${po.filename}... (${completedComparisons + 1}/${totalComparisons})`, { id: "matching" });
 
-            // Combine images from this specific invoice-PO pair
-            const pairImages: ConvertedImage[] = [];
-            
-            // Add invoice images first
-            pairImages.push(...invoice.images);
-            // Add PO images
-            pairImages.push(...po.images);
+            // Get the parsed JSON data from classification responses (NO MORE BASE64!)
+            const invoiceData = invoice.classificationResponse?.parsedContent || {};
+            const poData = po.classificationResponse?.parsedContent || {};
 
-            const imageUrlObjects = pairImages.map((img) => ({
-              type: "image_url",
-              image_url: { url: img.base64 },
-            }));
-
+            // Create the comparison payload using ONLY JSON data
             const payload = {
               model: "usf-mini",
               messages: [
@@ -614,16 +505,18 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
                 },
                 {
                   role: "user",
-                  content: [
-                    {
-                      type: "text",
-                      text: `Compare this invoice (${invoice.filename}) with this purchase order (${po.filename}). The first ${invoice.images.length} image(s) are from the invoice, and the remaining ${po.images.length} image(s) are from the purchase order. Determine if these documents are related and provide detailed field comparison.`,
-                    },
-                    ...imageUrlObjects,
-                  ],
+                  content: `Please compare the following invoice and purchase order data and provide a detailed field-by-field analysis:
+
+INVOICE DATA (${invoice.filename}):
+${JSON.stringify(invoiceData, null, 2)}
+
+PURCHASE ORDER DATA (${po.filename}):
+${JSON.stringify(poData, null, 2)}
+
+Perform intelligent comparison between these documents and determine their relationship, matching fields, and any discrepancies. Focus on business logic relationships and provide confidence scores for each comparison.`,
                 },
               ],
-              temperature: 0.7,
+              temperature: 0.3,
               stream: false,
               max_tokens: 4096,
             };
@@ -671,6 +564,8 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
               poIndex: j,
               invoiceFilename: invoice.filename,
               poFilename: po.filename,
+              invoiceData: invoiceData,
+              poData: poData,
               comparison: parsedContent,
               relationshipScore: parsedContent.summary?.match_percentage || 0,
               isLikelyMatch: (parsedContent.summary?.match_percentage || 0) > 70
@@ -687,6 +582,8 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
               poIndex: j,
               invoiceFilename: invoice.filename,
               poFilename: po.filename,
+              invoiceData: invoice.classificationResponse?.parsedContent || {},
+              poData: po.classificationResponse?.parsedContent || {},
               comparison: { error: 'Comparison failed', details: String(error) },
               relationshipScore: 0,
               isLikelyMatch: false
@@ -704,8 +601,8 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
         comparisonMatrix: comparisonResults,
         likelyMatches: comparisonResults.filter(result => result.isLikelyMatch),
         summary: {
-          totalInvoices: extractedInvoices.length,
-          totalPOs: extractedPOs.length,
+          totalInvoices: invoiceDocuments.length,
+          totalPOs: poDocuments.length,
           highConfidenceMatches: comparisonResults.filter(result => result.relationshipScore > 80).length,
           mediumConfidenceMatches: comparisonResults.filter(result => result.relationshipScore > 50 && result.relationshipScore <= 80).length,
           lowConfidenceMatches: comparisonResults.filter(result => result.relationshipScore <= 50).length
