@@ -4,6 +4,7 @@ import {
   OCR_COMPARISON_SYSTEM_PROMPT,
   OCR_EXTRACTION_INSTRUCTION,
 } from "../../config/ocr-system-prompt";
+import JsonViewer from "../JsonViewer";
 
 let pdfjsLib: any = null;
 
@@ -39,6 +40,15 @@ export default function ManualUpload({
   const [poActiveTab, setPOActiveTab] = useState<"preview" | "json">("preview");
   const [matchingResult, setMatchingResult] = useState<any>(null);
   const [isMatching, setIsMatching] = useState(false);
+
+  const copyResponseToClipboard = (response: any, fileName: string) => {
+    const responseText = JSON.stringify(response, null, 2);
+    navigator.clipboard.writeText(responseText).then(() => {
+      toast.success(`Copied LLM response for ${fileName}`);
+    }).catch(() => {
+      toast.error('Failed to copy response');
+    });
+  };
 
   const convertPDFToImages = async (file: File): Promise<ConvertedImage[]> => {
     if (!pdfjsLib) {
@@ -90,14 +100,9 @@ export default function ManualUpload({
           content: [
             {
               type: "text",
-              text: `You are an intelligent document-processing assistant trained to analyze multiple image inputs.
-Review each image carefully and identify whether it contains an invoice or purchase order.
-
-If it does, extract all relevant structured fields (vendor, invoice/PO number, date, amount, item details, taxes, totals, etc.).
-
-If an image does not contain relevant financial data, exclude it from analysis.
-Maintain consistent output formatting and indicate skipped images clearly if necessary.
-Ensure numerical accuracy and preserve formatting for dates and currency.`,
+              text: `
+                You are an intelligent document data extraction and classification system. You will receive MULTIPLE images. For each image, your task is to:\n\n1) DETECTION & CLASSIFICATION\n- Identify whether the image contains an INVOICE or a PURCHASE ORDER (PO).\n- If neither applies, mark it as {\"document_type\": \"none\", \"skipped\": true, \"reason\": \"No invoice or purchase order detected\"}.\n- If both types appear, select the dominant type (the document's main purpose).\n\n2) SMART DOCUMENT TYPE INFERENCE\nBe context-aware and infer the document type even if explicit words like \"Invoice\" or \"Purchase Order\" are missing.\nUse these advanced heuristics:\n  - **Invoice indicators:** presence of terms like \"Invoice Number\", \"Bill To\", \"Due Date\", \"Payment Terms\", \"Subtotal\", \"Tax\", or bank/payment info.\n  - **Purchase Order indicators:** presence of structured order lines, fields like \"PO Number\", \"Requested By\", \"Approved By\", \"Ship To\", \"Delivery Date\", \"Order Date\", or a layout showing ordered items before invoicing.\n  - If the document shows buyer-issued intent (ordering goods/services) — classify as PURCHASE ORDER.\n  - If the document shows seller-issued billing intent (requesting payment) — classify as INVOICE.\n  - Be smart enough to infer from context (e.g., headers, field semantics, layout, or typical company identifiers).\n\n3) OUTPUT FORMAT (STRICT, UNIFORM JSON)\nReturn a single JSON object with a top-level key \"documents\" that is an array.\nEach array element represents one input image, maintaining the same schema for all document types.\nIf a value is unavailable, use null (do not omit keys).\n\n4) UNIFORM SCHEMA\nEach document object must have the following structure:\n{\n  \"source_id\": string,                // filename or sequential index (e.g. \"1\", \"img_001\")\n  \"document_type\": \"invoice\" | \"purchase_order\" | \"none\",\n  \"skipped\": boolean,\n  \"reason\": string | null,\n  \"currency\": string | null,          // ISO currency code if identifiable\n  \"totals\": {\n    \"subtotal\": number | null,\n    \"tax\": number | null,\n    \"shipping\": number | null,\n    \"discount\": number | null,\n    \"grand_total\": number | null\n  },\n  \"parties\": {\n    \"seller\": {\n      \"name\": string | null,\n      \"tax_id\": string | null,\n      \"address\": string | null,\n      \"email\": string | null,\n      \"phone\": string | null\n    },\n    \"buyer\": {\n      \"name\": string | null,\n      \"tax_id\": string | null,\n      \"address\": string | null,\n      \"email\": string | null,\n      \"phone\": string | null\n    }\n  },\n  \"line_items\": [\n    {\n      \"description\": string | null,\n      \"sku\": string | null,\n      \"quantity\": number | null,\n      \"unit\": string | null,\n      \"unit_price\": number | null,\n      \"tax_rate\": number | null,\n      \"amount\": number | null\n    }\n  ],\n  \"dates\": {\n    \"issue_date\": \"YYYY-MM-DD\" | null,\n    \"due_date\": \"YYYY-MM-DD\" | null,\n    \"delivery_date\": \"YYYY-MM-DD\" | null\n  },\n  \"identifiers\": {\n    \"invoice_number\": string | null,\n    \"po_number\": string | null,\n    \"order_number\": string | null,\n    \"customer_id\": string | null\n  },\n  \"payment_terms\": {\n    \"terms_text\": string | null,\n    \"days\": number | null\n  },\n  \"shipping\": {\n    \"ship_to\": string | null,\n    \"bill_to\": string | null,\n    \"incoterms\": string | null,\n    \"method\": string | null,\n    \"tracking_number\": string | null\n  },\n  \"confidence\": {\n    \"document_type\": number,          // 0-1 likelihood of correct classification\n    \"fields_overall\": number          // 0-1 average extraction confidence\n  }\n}\n\n5) FIELD EXTRACTION LOGIC\n- Always include all keys in the schema, even if null.\n- INVOICE priority fields: invoice_number, issue_date, due_date, totals, payment_terms, seller, buyer.\n- PURCHASE ORDER priority fields: po_number, order_date (issue_date), delivery_date, buyer/seller, line items, and shipping details.\n- Use consistent ISO 8601 (YYYY-MM-DD) for all dates.\n- Parse numeric fields as numbers, remove currency symbols, and put the ISO code in \"currency\".\n- Compute line item amount = quantity x unit_price when possible.\n- Never hallucinate values; use null if uncertain.\n\n6) OUTPUT REQUIREMENTS\n- Output must be a single valid JSON object, structured as:\n{\n  \"documents\": [ {document_1}, {document_2}, ... ]\n}\n- No markdown, no explanations, no commentary.\n- Maintain input order.\n- Ensure perfect JSON validity.\n\nReturn ONLY this JSON structure.
+              `,
 
               // text: `Extract all data from this ${
               //   type === "invoice" ? "invoice" : "purchase order"
@@ -139,21 +144,27 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
         const content = response.choices[0].message.content;
 
         // Extract JSON from markdown code block if present
-        const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+        const jsonMatch = content.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
         if (jsonMatch && jsonMatch[1]) {
           try {
-            parsedContent = JSON.parse(jsonMatch[1]);
+            parsedContent = JSON.parse(jsonMatch[1].trim());
+            console.log("Successfully parsed JSON from markdown block:", parsedContent);
           } catch (e) {
-            console.error("Failed to parse JSON from content:", e);
+            console.error("Failed to parse JSON from markdown block:", e);
             parsedContent = { raw_content: content };
           }
         } else {
-          // If no JSON block found, try to parse the entire content
+          // If no JSON block found, try to parse the entire content as JSON
           try {
             parsedContent = JSON.parse(content);
+            console.log("Successfully parsed raw JSON content:", parsedContent);
           } catch (e) {
-            // If parsing fails, store the raw content
-            parsedContent = { raw_content: content };
+            console.error("Content is not valid JSON, keeping as raw text");
+            // If parsing fails, extract structured data from raw content
+            parsedContent = {
+              raw_content: content,
+              extracted_data: extractSummaryFromText(content)
+            };
           }
         }
       }
@@ -211,7 +222,23 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
             content: [
               {
                 type: "text",
-                text: `Compare these invoice and purchase order documents. The first ${invoiceResult.images.length} image(s) are from the invoice, and the remaining ${poResult.images.length} image(s) are from the purchase order.`,
+                text: `Compare these invoice and purchase order documents. The first ${invoiceResult.images.length} image(s) are from the invoice, and the remaining ${poResult.images.length} image(s) are from the purchase order.
+
+IMPORTANT: In your response, please:
+1. Extract all data from both documents in JSON format
+2. Create a field mapping showing which Invoice fields correspond to which PO fields (even if key names differ)
+3. Identify value matches (where values are same but keys might be different)
+4. Identify mismatches (where keys map but values differ)
+5. Show the differences between Invoice and Purchase Order clearly
+6. Provide a risk score and overall analysis
+
+Include sections for:
+- invoice_data: All extracted invoice fields
+- po_data: All extracted PO/Work Confirmation fields
+- field_mapping: Show how fields correspond (e.g., "invoice_number" → "document_number")
+- matched_values: Fields with same values (even if key names differ)
+- mismatched_values: Fields that should match but have different values
+- differences_summary: Clear explanation of what differs between the documents`,
               },
               ...imageUrlObjects,
             ],
@@ -259,14 +286,103 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
         }
       }
 
+      // Check if we got raw_content and try to parse it better
+      if (parsedContent.raw_content && typeof parsedContent.raw_content === 'string') {
+        // Try to extract structured data from markdown-style text
+        const rawText = parsedContent.raw_content;
+        parsedContent = {
+          is_raw_response: true,
+          raw_text: rawText,
+          extracted_summary: extractSummaryFromText(rawText)
+        };
+      }
+
       setMatchingResult(parsedContent);
       toast.success("Comparison complete!", { id: "matching" });
+      
+      // Auto-scroll to comparison section
+      setTimeout(() => {
+        const comparisonSection = document.getElementById('comparison-section');
+        if (comparisonSection) {
+          comparisonSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     } catch (error) {
       toast.error("Comparison failed", { id: "matching" });
       console.error("Matching Error:", error);
     } finally {
       setIsMatching(false);
     }
+  };
+
+  // Helper function to extract structured data from raw text
+  const extractSummaryFromText = (text: string) => {
+    const result: any = {};
+    
+    // Remove markdown formatting
+    let cleanText = text.replace(/\*\*/g, '');
+    
+    // Extract Document Type
+    const docTypeMatch = cleanText.match(/Document Type:\s*([^\n]+)/i);
+    if (docTypeMatch) result.document_type = docTypeMatch[1].trim();
+
+    // Extract Vendor Details
+    const vendorNameMatch = cleanText.match(/Vendor Name:\s*([^\n]+)/i);
+    if (vendorNameMatch) result.vendor_name = vendorNameMatch[1].trim();
+
+    const vendorTaxMatch = cleanText.match(/Vendor Tax Registration Number:\s*([^\n]+)/i);
+    if (vendorTaxMatch) result.vendor_tax_number = vendorTaxMatch[1].trim();
+
+    // Extract Invoice Details
+    const invoiceNumMatch = cleanText.match(/Invoice Number:\s*([^\n]+)/i);
+    if (invoiceNumMatch) result.invoice_number = invoiceNumMatch[1].trim();
+
+    const invoiceDateMatch = cleanText.match(/Invoice Date:\s*([^\n]+)/i);
+    if (invoiceDateMatch) result.invoice_date = invoiceDateMatch[1].trim();
+
+    const dueDateMatch = cleanText.match(/Due Date:\s*([^\n]+)/i);
+    if (dueDateMatch) result.due_date = dueDateMatch[1].trim();
+
+    const contractPOMatch = cleanText.match(/Contract\/P\.?O\.? Number:\s*([^\n]+)/i);
+    if (contractPOMatch) result.contract_po_number = contractPOMatch[1].trim();
+
+    const serviceMonthMatch = cleanText.match(/Service Month:\s*([^\n]+)/i);
+    if (serviceMonthMatch) result.service_month = serviceMonthMatch[1].trim();
+
+    // Extract Customer Details
+    const customerToMatch = cleanText.match(/To:\s*([^\n]+)/i);
+    if (customerToMatch) result.customer_name = customerToMatch[1].trim();
+
+    const addressMatch = cleanText.match(/Address:\s*([^\n]+(?:\n(?!\*\*)[^\n]+)*)/i);
+    if (addressMatch) result.customer_address = addressMatch[1].trim().replace(/\n/g, ' ');
+
+    const phoneMatch = cleanText.match(/Phone:\s*([^\n]+)/i);
+    if (phoneMatch) result.phone = phoneMatch[1].trim();
+
+    const taxRegMatch = cleanText.match(/Tax Registration Number:\s*([^\n]+)/i);
+    if (taxRegMatch) result.customer_tax_number = taxRegMatch[1].trim();
+
+    // Extract Financial Details
+    const subtotalMatch = cleanText.match(/Subtotal:\s*(?:AED\s*)?([0-9,]+\.?\d*)/i);
+    if (subtotalMatch) result.subtotal = subtotalMatch[1].trim();
+
+    const taxMatch = cleanText.match(/Tax.*?:\s*(?:AED\s*)?([0-9,]+\.?\d*)/i);
+    if (taxMatch) result.tax_amount = taxMatch[1].trim();
+
+    const totalMatch = cleanText.match(/Total:\s*(?:AED\s*)?([0-9,]+\.?\d*)/i);
+    if (totalMatch) result.total_amount = totalMatch[1].trim();
+
+    // Extract Item Details
+    const descMatch = cleanText.match(/Description:\s*([^\n]+(?:\n(?!\*\*)[^\n]+)*)/i);
+    if (descMatch) result.item_description = descMatch[1].trim().replace(/\n/g, ' ');
+
+    const qtyMatch = cleanText.match(/(?:Qty|Quantity):\s*([^\n]+)/i);
+    if (qtyMatch) result.quantity = qtyMatch[1].trim();
+
+    const rateMatch = cleanText.match(/Rate:\s*([^\n]+)/i);
+    if (rateMatch) result.rate = rateMatch[1].trim();
+
+    return result;
   };
 
   const handleUpload = async (
@@ -322,6 +438,8 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
     e.target.value = "";
   };
 
+
+
   const renderTabbedResult = (
     result: ProcessedResult,
     activeTab: "preview" | "json",
@@ -330,10 +448,21 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-slate-900">
+          <h3 className="text-lg font-medium text-slate-900 truncate max-w-xs" title={result.fileName}>
             {result.fileName}
           </h3>
-          <div className="flex bg-slate-100 rounded-lg p-1">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => copyResponseToClipboard(result.response, result.fileName)}
+              className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+              title="Copy LLM response"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy Response
+            </button>
+            <div className="flex bg-slate-100 rounded-lg p-1">
             <button
               onClick={() => setActiveTab("preview")}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -354,6 +483,7 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
             >
               JSON Response
             </button>
+            </div>
           </div>
         </div>
 
@@ -383,10 +513,20 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
-            <pre className="text-sm text-slate-800 overflow-auto max-h-[600px] whitespace-pre-wrap">
-              {JSON.stringify(result.response, null, 2)}
-            </pre>
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm max-h-[600px] overflow-auto">
+            {result.response.extracted_data ? (
+              <JsonViewer data={result.response.extracted_data} />
+            ) : result.response.raw_content ? (
+              <div className="space-y-4">
+                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <pre className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono">
+                    {result.response.raw_content}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <JsonViewer data={result.response} />
+            )}
           </div>
         )}
       </div>
@@ -573,7 +713,7 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
 
       {/* Matching Results Section */}
       {matchingResult && (
-        <div className="mt-8 space-y-6">
+        <div id="comparison-section" className="mt-8 space-y-6">
           {/* Header Card */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 shadow-xl">
             <div className="flex items-center justify-between mb-6">
@@ -698,13 +838,97 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
             </div>
           </div>
 
-          {/* Field Comparison Table */}
+          {/* Side-by-Side Comparison of Invoice and PO Data */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-700 to-slate-600 px-6 py-4">
-              <h3 className="text-lg font-bold text-white">
-                Field-by-Field Comparison
-              </h3>
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+              <h3 className="text-lg font-bold text-white">Document Comparison</h3>
             </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Invoice Data Column */}
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900 mb-4 pb-2 border-b-2 border-blue-500">
+                    Invoice Data
+                  </h4>
+                  <div className="space-y-2">
+                    {invoiceResult?.response.extracted_data ? (
+                      Object.entries(invoiceResult.response.extracted_data).map(([key, value]: [string, any]) => (
+                        <div key={key} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <p className="text-xs text-blue-600 font-medium mb-1">
+                            {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </p>
+                          <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </p>
+                        </div>
+                      ))
+                    ) : invoiceResult?.response ? (
+                      Object.entries(invoiceResult.response).map(([key, value]: [string, any]) => (
+                        key !== 'raw_content' && key !== 'extracted_data' && (
+                          <div key={key} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                            <p className="text-xs text-blue-600 font-medium mb-1">
+                              {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
+                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </p>
+                          </div>
+                        )
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No data available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* PO Data Column */}
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900 mb-4 pb-2 border-b-2 border-green-500">
+                    Purchase Order Data
+                  </h4>
+                  <div className="space-y-2">
+                    {poResult?.response.extracted_data ? (
+                      Object.entries(poResult.response.extracted_data).map(([key, value]: [string, any]) => (
+                        <div key={key} className="bg-green-50 rounded-lg p-3 border border-green-200">
+                          <p className="text-xs text-green-600 font-medium mb-1">
+                            {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </p>
+                          <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </p>
+                        </div>
+                      ))
+                    ) : poResult?.response ? (
+                      Object.entries(poResult.response).map(([key, value]: [string, any]) => (
+                        key !== 'raw_content' && key !== 'extracted_data' && (
+                          <div key={key} className="bg-green-50 rounded-lg p-3 border border-green-200">
+                            <p className="text-xs text-green-600 font-medium mb-1">
+                              {key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900 break-words overflow-wrap-anywhere">
+                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </p>
+                          </div>
+                        )
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No data available</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Field Comparison Table (only if structured data exists) */}
+          {!matchingResult.is_raw_response && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-700 to-slate-600 px-6 py-4">
+                <h3 className="text-lg font-bold text-white">
+                  Field-by-Field Comparison
+                </h3>
+              </div>
 
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -868,6 +1092,7 @@ Ensure numerical accuracy and preserve formatting for dates and currency.`,
               </div>
             </div>
           </div>
+          )}
 
           {/* Detected Anomalies */}
           {matchingResult.detected_anomalies &&
