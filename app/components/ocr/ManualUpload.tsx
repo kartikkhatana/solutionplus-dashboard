@@ -95,21 +95,48 @@ export default function ManualUpload({
               text: `
                 You are an intelligent document data extraction and classification system. You will receive MULTIPLE images. For each image, your task is to:
 
+**IMPORTANT CONTEXT: This document was uploaded by the user in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" upload section. This is a strong indicator of the document type.**
+
 1) DETECTION & CLASSIFICATION
 - Identify whether the image contains an INVOICE or a PURCHASE ORDER (PO).
+- CRITICAL: The user uploaded this in the "${type === "invoice" ? "INVOICE" : "PURCHASE ORDER"}" section, so unless there is overwhelming evidence to the contrary, classify it as "${type === "invoice" ? "invoice" : "purchase_order"}".
 - If neither applies, mark it as {"document_type": "none", "skipped": true, "reason": "No invoice or purchase order detected"}.
 - If both types appear, select the dominant type (the document's main purpose).
 - Only include images that contain invoice or purchase order data fields (e.g., totals, line items, billing details, references, parties, or identifiable financial structure).
 - Skip and exclude pages that contain only headers, logos, stamps, signatures, attachments, or blank/irrelevant content. For skipped pages, still include a JSON entry marking "skipped": true.
 
 2) SMART DOCUMENT TYPE INFERENCE
-Be context-aware and infer the document type even if explicit words like "Invoice" or "Purchase Order" are missing.
-Use these advanced heuristics:
-  - **Invoice indicators:** presence of terms like "Invoice Number", "Bill To", "Due Date", "Payment Terms", "Subtotal", "Tax", or bank/payment info.
-  - **Purchase Order indicators:** presence of structured order lines, fields like "PO Number", "Requested By", "Approved By", "Ship To", "Delivery Date", "Order Date", or a layout showing ordered items before invoicing.
-  - If the document shows buyer-issued intent (ordering goods/services) — classify as PURCHASE ORDER.
-  - If the document shows seller-issued billing intent (requesting payment) — classify as INVOICE.
-  - Be smart enough to infer from context (e.g., headers, field semantics, layout, or typical company identifiers).
+**CRITICAL: You must correctly identify whether each document is an INVOICE or PURCHASE ORDER based on these strict criteria:**
+
+**INVOICE (seller requesting payment):**
+  - Contains explicit words: "Invoice", "Tax Invoice", "Bill", "Statement"
+  - Shows PAYMENT REQUEST intent with bank details or payment instructions
+  - Has "Amount Due", "Please Pay", "Payment Terms", "Due Date"
+  - Sender is the SELLER/VENDOR requesting payment
+  - Contains bank account details for receiving payment
+  - May reference a PO number but is asking for payment
+  - Footer often has payment instructions or bank transfer details
+  
+**PURCHASE ORDER (buyer ordering goods/services):**
+  - Contains explicit words: "Purchase Order", "PO", "Work Order", "Service Order"
+  - Shows ORDERING intent - buyer telling seller what to provide
+  - Has fields like "PO Number", "Order Number", "Requisition Number"
+  - Contains "Requested By", "Approved By", "Buyer", "Procurement"
+  - Sender is the BUYER/CLIENT placing an order
+  - May have "Ship To", "Deliver To", "Service Location"
+  - Usually has approval signatures or procurement department stamps
+  - Does NOT request payment - it authorizes future payment
+  
+**Key Distinguishing Factor:**
+- INVOICE = "Please PAY us" (seller to buyer)
+- PURCHASE ORDER = "Please PROVIDE this" (buyer to seller)
+
+If document header says "PURCHASE ORDER" or "PO" → classify as "purchase_order"
+If document header says "INVOICE" or "TAX INVOICE" → classify as "invoice"
+
+When in doubt, check WHO is the sender and WHAT is the intent:
+- Seller asking for money → INVOICE
+- Buyer ordering goods/services → PURCHASE ORDER
 
 3) OUTPUT FORMAT (STRICT, UNIFORM JSON)
 Return a single JSON object with a top-level key "documents" that is an array.
