@@ -110,7 +110,7 @@ export default function ManualUpload({
       ],
       temperature: 0.7,
       stream: false,
-      max_tokens: 2048,
+      max_tokens: 4096,
     };
 
     try {
