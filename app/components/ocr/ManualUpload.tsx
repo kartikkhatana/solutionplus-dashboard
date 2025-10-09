@@ -93,7 +93,120 @@ export default function ManualUpload({
             {
               type: "text",
               text: `
-                You are an intelligent document data extraction and classification system. You will receive MULTIPLE images. For each image, your task is to:\n\n1) DETECTION & CLASSIFICATION\n- Identify whether the image contains an INVOICE or a PURCHASE ORDER (PO).\n- If neither applies, mark it as {\"document_type\": \"none\", \"skipped\": true, \"reason\": \"No invoice or purchase order detected\"}.\n- If both types appear, select the dominant type (the document's main purpose).\n\n2) SMART DOCUMENT TYPE INFERENCE\nBe context-aware and infer the document type even if explicit words like \"Invoice\" or \"Purchase Order\" are missing.\nUse these advanced heuristics:\n  - **Invoice indicators:** presence of terms like \"Invoice Number\", \"Bill To\", \"Due Date\", \"Payment Terms\", \"Subtotal\", \"Tax\", or bank/payment info.\n  - **Purchase Order indicators:** presence of structured order lines, fields like \"PO Number\", \"Requested By\", \"Approved By\", \"Ship To\", \"Delivery Date\", \"Order Date\", or a layout showing ordered items before invoicing.\n  - If the document shows buyer-issued intent (ordering goods/services) — classify as PURCHASE ORDER.\n  - If the document shows seller-issued billing intent (requesting payment) — classify as INVOICE.\n  - Be smart enough to infer from context (e.g., headers, field semantics, layout, or typical company identifiers).\n\n3) OUTPUT FORMAT (STRICT, UNIFORM JSON)\nReturn a single JSON object with a top-level key \"documents\" that is an array.\nEach array element represents one input image, maintaining the same schema for all document types.\nIf a value is unavailable, use null (do not omit keys).\n\n4) UNIFORM SCHEMA\nEach document object must have the following structure:\n{\n  \"source_id\": string,                // filename or sequential index (e.g. \"1\", \"img_001\")\n  \"document_type\": \"invoice\" | \"purchase_order\" | \"none\",\n  \"skipped\": boolean,\n  \"reason\": string | null,\n  \"currency\": string | null,          // ISO currency code if identifiable\n  \"totals\": {\n    \"subtotal\": number | null,\n    \"tax\": number | null,\n    \"shipping\": number | null,\n    \"discount\": number | null,\n    \"grand_total\": number | null\n  },\n  \"parties\": {\n    \"seller\": {\n      \"name\": string | null,\n      \"tax_id\": string | null,\n      \"address\": string | null,\n      \"email\": string | null,\n      \"phone\": string | null\n    },\n    \"buyer\": {\n      \"name\": string | null,\n      \"tax_id\": string | null,\n      \"address\": string | null,\n      \"email\": string | null,\n      \"phone\": string | null\n    }\n  },\n  \"line_items\": [\n    {\n      \"description\": string | null,\n      \"sku\": string | null,\n      \"quantity\": number | null,\n      \"unit\": string | null,\n      \"unit_price\": number | null,\n      \"tax_rate\": number | null,\n      \"amount\": number | null\n    }\n  ],\n  \"dates\": {\n    \"issue_date\": \"YYYY-MM-DD\" | null,\n    \"due_date\": \"YYYY-MM-DD\" | null,\n    \"delivery_date\": \"YYYY-MM-DD\" | null\n  },\n  \"identifiers\": {\n    \"invoice_number\": string | null,\n    \"po_number\": string | null,\n    \"order_number\": string | null,\n    \"customer_id\": string | null\n  },\n  \"payment_terms\": {\n    \"terms_text\": string | null,\n    \"days\": number | null\n  },\n  \"shipping\": {\n    \"ship_to\": string | null,\n    \"bill_to\": string | null,\n    \"incoterms\": string | null,\n    \"method\": string | null,\n    \"tracking_number\": string | null\n  },\n  \"confidence\": {\n    \"document_type\": number,          // 0-1 likelihood of correct classification\n    \"fields_overall\": number          // 0-1 average extraction confidence\n  }\n}\n\n5) FIELD EXTRACTION LOGIC\n- Always include all keys in the schema, even if null.\n- INVOICE priority fields: invoice_number, issue_date, due_date, totals, payment_terms, seller, buyer.\n- PURCHASE ORDER priority fields: po_number, order_date (issue_date), delivery_date, buyer/seller, line items, and shipping details.\n- Use consistent ISO 8601 (YYYY-MM-DD) for all dates.\n- Parse numeric fields as numbers, remove currency symbols, and put the ISO code in \"currency\".\n- Compute line item amount = quantity x unit_price when possible.\n- Never hallucinate values; use null if uncertain.\n\n6) OUTPUT REQUIREMENTS\n- Output must be a single valid JSON object, structured as:\n{\n  \"documents\": [ {document_1}, {document_2}, ... ]\n}\n- No markdown, no explanations, no commentary.\n- Maintain input order.\n- Ensure perfect JSON validity.\n\nReturn ONLY this JSON structure.
+                You are an intelligent document data extraction and classification system. You will receive MULTIPLE images. For each image, your task is to:
+
+1) DETECTION & CLASSIFICATION
+- Identify whether the image contains an INVOICE or a PURCHASE ORDER (PO).
+- If neither applies, mark it as {"document_type": "none", "skipped": true, "reason": "No invoice or purchase order detected"}.
+- If both types appear, select the dominant type (the document's main purpose).
+- Only include images that contain invoice or purchase order data fields (e.g., totals, line items, billing details, references, parties, or identifiable financial structure).
+- Skip and exclude pages that contain only headers, logos, stamps, signatures, attachments, or blank/irrelevant content. For skipped pages, still include a JSON entry marking "skipped": true.
+
+2) SMART DOCUMENT TYPE INFERENCE
+Be context-aware and infer the document type even if explicit words like "Invoice" or "Purchase Order" are missing.
+Use these advanced heuristics:
+  - **Invoice indicators:** presence of terms like "Invoice Number", "Bill To", "Due Date", "Payment Terms", "Subtotal", "Tax", or bank/payment info.
+  - **Purchase Order indicators:** presence of structured order lines, fields like "PO Number", "Requested By", "Approved By", "Ship To", "Delivery Date", "Order Date", or a layout showing ordered items before invoicing.
+  - If the document shows buyer-issued intent (ordering goods/services) — classify as PURCHASE ORDER.
+  - If the document shows seller-issued billing intent (requesting payment) — classify as INVOICE.
+  - Be smart enough to infer from context (e.g., headers, field semantics, layout, or typical company identifiers).
+
+3) OUTPUT FORMAT (STRICT, UNIFORM JSON)
+Return a single JSON object with a top-level key "documents" that is an array.
+Each array element represents one input image, maintaining the same schema for all document types.
+If a value is unavailable, use null (do not omit keys).
+
+4) UNIFORM SCHEMA
+Each document object must have the following structure:
+{
+  "source_id": string,                // filename or sequential index (e.g. "1", "img_001")
+  "document_type": "invoice" | "purchase_order" | "none",
+  "skipped": boolean,
+  "reason": string | null,
+  "currency": string | null,          // ISO currency code if identifiable
+  "totals": {
+    "subtotal": number | null,
+    "tax": number | null,
+    "shipping": number | null,
+    "discount": number | null,
+    "grand_total": number | null
+  },
+  "parties": {
+    "seller": {
+      "name": string | null,
+      "tax_id": string | null,
+      "address": string | null,
+      "email": string | null,
+      "phone": string | null
+    },
+    "buyer": {
+      "name": string | null,
+      "tax_id": string | null,
+      "address": string | null,
+      "email": string | null,
+      "phone": string | null
+    }
+  },
+  "line_items": [
+    {
+      "description": string | null,
+      "sku": string | null,
+      "quantity": number | null,
+      "unit": string | null,
+      "unit_price": number | null,
+      "tax_rate": number | null,
+      "amount": number | null
+    }
+  ],
+  "dates": {
+    "issue_date": "YYYY-MM-DD" | null,
+    "due_date": "YYYY-MM-DD" | null,
+    "delivery_date": "YYYY-MM-DD" | null
+  },
+  "identifiers": {
+    "invoice_number": string | null,
+    "po_number": string | null,
+    "order_number": string | null,
+    "customer_id": string | null
+  },
+  "payment_terms": {
+    "terms_text": string | null,
+    "days": number | null
+  },
+  "shipping": {
+    "ship_to": string | null,
+    "bill_to": string | null,
+    "incoterms": string | null,
+    "method": string | null,
+    "tracking_number": string | null
+  },
+  "confidence": {
+    "document_type": number,          // 0-1 likelihood of correct classification
+    "fields_overall": number          // 0-1 average extraction confidence
+  }
+}
+
+5) FIELD EXTRACTION LOGIC
+- Always include all keys in the schema, even if null.
+- INVOICE priority fields: invoice_number, issue_date, due_date, totals, payment_terms, seller, buyer.
+- PURCHASE ORDER priority fields: po_number, order_date (issue_date), delivery_date, buyer/seller, line items, and shipping details.
+- Use consistent ISO 8601 (YYYY-MM-DD) for all dates.
+- Parse numeric fields as numbers, remove currency symbols, and put the ISO code in "currency".
+- Compute line item amount = quantity x unit_price when possible.
+- Never hallucinate values; use null if uncertain.
+
+6) OUTPUT REQUIREMENTS
+- Output must be a single valid JSON object, structured as:
+{
+  "documents": [ {document_1}, {document_2}, ... ]
+}
+- No markdown, no explanations, no commentary.
+- Maintain input order.
+- Ensure perfect JSON validity.
+- ⚠️ Only include documents that contain **extractable financial data (invoice or PO fields)**.
+  Non-relevant or decorative pages should be marked \`"skipped": true\` and excluded from extraction.
+
+Return ONLY this JSON structure.
               `,
 
               // text: `Extract all data from this ${
@@ -497,11 +610,47 @@ Include sections for:
         ) : (
           <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm max-h-[600px] overflow-auto">
             <pre className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-mono">
-              {result.response.extracted_data 
-                ? JSON.stringify(result.response.extracted_data, null, 2)
-                : result.response.raw_content 
-                ? result.response.raw_content
-                : JSON.stringify(result.response, null, 2)}
+              {(() => {
+                try {
+                  // Check if response has raw_content that needs parsing
+                  if (result.response.raw_content && typeof result.response.raw_content === 'string') {
+                    let content = result.response.raw_content;
+                    
+                    // Try to extract JSON from markdown code block
+                    const jsonMatch = content.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+                    if (jsonMatch && jsonMatch[1]) {
+                      content = jsonMatch[1].trim();
+                    }
+                    
+                    // Try to parse and re-stringify for proper formatting
+                    try {
+                      const parsedJson = JSON.parse(content);
+                      return JSON.stringify(parsedJson, null, 2);
+                    } catch (parseError) {
+                      // If direct parsing fails, try to unescape the content
+                      try {
+                        // Remove escape characters and try again
+                        const unescaped = content
+                          .replace(/\\"/g, '"')
+                          .replace(/\\n/g, '\n')
+                          .replace(/\\\\/g, '\\');
+                        const parsedJson = JSON.parse(unescaped);
+                        return JSON.stringify(parsedJson, null, 2);
+                      } catch (e) {
+                        // If all parsing attempts fail, show the raw content
+                        console.error('Failed to parse JSON:', e);
+                        return content;
+                      }
+                    }
+                  }
+                  
+                  // Otherwise, stringify the response normally
+                  return JSON.stringify(result.response, null, 2);
+                } catch (error) {
+                  console.error('Error displaying JSON:', error);
+                  return 'Error displaying JSON response. Please check the console for details.';
+                }
+              })()}
             </pre>
           </div>
         )}
@@ -1094,12 +1243,26 @@ Include sections for:
                     { label: 'Currency', path: 'currency' },
                     { label: 'Subtotal', path: 'totals.subtotal' },
                     { label: 'Tax', path: 'totals.tax' },
+                    { label: 'Shipping', path: 'totals.shipping' },
+                    { label: 'Discount', path: 'totals.discount' },
                     { label: 'Grand Total', path: 'totals.grand_total' },
                     { label: 'Seller Name', path: 'parties.seller.name' },
+                    { label: 'Seller Tax ID', path: 'parties.seller.tax_id' },
+                    { label: 'Seller Address', path: 'parties.seller.address' },
+                    { label: 'Seller Email', path: 'parties.seller.email' },
+                    { label: 'Seller Phone', path: 'parties.seller.phone' },
                     { label: 'Buyer Name', path: 'parties.buyer.name' },
+                    { label: 'Buyer Tax ID', path: 'parties.buyer.tax_id' },
+                    { label: 'Buyer Address', path: 'parties.buyer.address' },
                     { label: 'Issue Date', path: 'dates.issue_date' },
+                    { label: 'Due Date', path: 'dates.due_date' },
+                    { label: 'Delivery Date', path: 'dates.delivery_date' },
                     { label: 'Invoice Number', path: 'identifiers.invoice_number' },
                     { label: 'PO Number', path: 'identifiers.po_number' },
+                    { label: 'Order Number', path: 'identifiers.order_number' },
+                    { label: 'Customer ID', path: 'identifiers.customer_id' },
+                    { label: 'Payment Terms', path: 'payment_terms.terms_text' },
+                    { label: 'Payment Days', path: 'payment_terms.days' },
                   ];
 
                   // Create CSV content
