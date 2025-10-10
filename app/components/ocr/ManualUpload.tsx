@@ -1,0 +1,951 @@
+import { useState } from "react";
+import toast from "react-hot-toast";
+import {
+  OCR_COMPARISON_SYSTEM_PROMPT,
+  OCR_EXTRACTION_INSTRUCTION,
+} from "../../config/ocr-system-prompt";
+
+let pdfjsLib: any = null;
+
+interface ConvertedImage {
+  base64: string;
+  pageNumber: number;
+}
+
+interface ProcessedResult {
+  images: ConvertedImage[];
+  response: any;
+  fileName: string;
+}
+
+interface ManualUploadProps {
+  onBack: () => void;
+  pdfLibLoaded: boolean;
+}
+
+export default function ManualUpload({
+  onBack,
+  pdfLibLoaded,
+}: ManualUploadProps) {
+  const [invoiceResult, setInvoiceResult] = useState<ProcessedResult | null>(
+    null
+  );
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [poResult, setPOResult] = useState<ProcessedResult | null>(null);
+  const [poLoading, setPOLoading] = useState(false);
+  const [invoiceActiveTab, setInvoiceActiveTab] = useState<"preview" | "json">(
+    "preview"
+  );
+  const [poActiveTab, setPOActiveTab] = useState<"preview" | "json">("preview");
+  const [matchingResult, setMatchingResult] = useState<any>(null);
+  const [isMatching, setIsMatching] = useState(false);
+
+  const convertPDFToImages = async (file: File): Promise<ConvertedImage[]> => {
+    if (!pdfjsLib) {
+      const pdfjs = await import("pdfjs-dist");
+      pdfjsLib = pdfjs;
+      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const images: ConvertedImage[] = [];
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      // Reduced scale from 2.0 to 1.2 for smaller file size
+      const viewport = page.getViewport({ scale: 1.2 });
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d")!;
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+      // Use JPEG format with compression (0.7 quality) instead of PNG
+      // This significantly reduces the base64 size
+      images.push({
+        base64: canvas.toDataURL("image/jpeg", 0.7),
+        pageNumber: pageNum,
+      });
+    }
+    return images;
+  };
+
+  const handleProcess = async (
+    images: ConvertedImage[],
+    fileName: string,
+    type: "invoice" | "po"
+  ) => {
+    // Prepare API payload with base64 images
+    const imageUrlObjects = images.map((img) => ({
+      type: "image_url",
+      image_url: { url: img.base64 },
+    }));
+
+    const payload = {
+      model: "usf-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `You are an intelligent document-processing assistant trained to analyze multiple image inputs.
+Review each image carefully and identify whether it contains an invoice or purchase order.
+
+If it does, extract all relevant structured fields (vendor, invoice/PO number, date, amount, item details, taxes, totals, etc.).
+
+If an image does not contain relevant financial data, exclude it from analysis.
+Maintain consistent output formatting and indicate skipped images clearly if necessary.
+Ensure numerical accuracy and preserve formatting for dates and currency.`,
+
+              // text: `Extract all data from this ${
+              //   type === "invoice" ? "invoice" : "purchase order"
+              // } document`,
+            },
+            ...imageUrlObjects,
+            {
+              type: "text",
+              text: "Provide structured data extraction including vendor name, amount, date, items, and other relevant fields",
+            },
+          ],
+        },
+      ],
+      temperature: 0.7,
+      stream: false,
+      max_tokens: 2048,
+    };
+
+    try {
+      // Call your API endpoint here
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/usf/v1/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const response = await res.json();
+
+      // Extract and parse the JSON content from the LLM response
+      let parsedContent = response;
+
+      if (response.choices && response.choices[0]?.message?.content) {
+        const content = response.choices[0].message.content;
+
+        // Extract JSON from markdown code block if present
+        const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            parsedContent = JSON.parse(jsonMatch[1]);
+          } catch (e) {
+            console.error("Failed to parse JSON from content:", e);
+            parsedContent = { raw_content: content };
+          }
+        } else {
+          // If no JSON block found, try to parse the entire content
+          try {
+            parsedContent = JSON.parse(content);
+          } catch (e) {
+            // If parsing fails, store the raw content
+            parsedContent = { raw_content: content };
+          }
+        }
+      }
+
+      // Store the result with images and parsed response
+      const result: ProcessedResult = {
+        images,
+        response: parsedContent,
+        fileName,
+      };
+
+      if (type === "invoice") {
+        setInvoiceResult(result);
+        setInvoiceActiveTab("preview");
+      } else {
+        setPOResult(result);
+        setPOActiveTab("preview");
+      }
+
+      toast.success(
+        `${type === "invoice" ? "Invoice" : "PO"} processed successfully!`
+      );
+    } catch (error) {
+      toast.error("Processing failed");
+      console.error("API Error:", error);
+    }
+  };
+
+  const handleProceed = async () => {
+    if (!invoiceResult || !poResult) return;
+
+    setIsMatching(true);
+    setMatchingResult(null);
+
+    try {
+      toast.loading("Comparing Invoice and PO...", { id: "matching" });
+
+      // Combine all images from both invoice and PO
+      const allImages = [...invoiceResult.images, ...poResult.images];
+
+      const imageUrlObjects = allImages.map((img) => ({
+        type: "image_url",
+        image_url: { url: img.base64 },
+      }));
+
+      const payload = {
+        model: "usf-mini",
+        messages: [
+          {
+            role: "system",
+            content: OCR_COMPARISON_SYSTEM_PROMPT,
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Compare these invoice and purchase order documents. The first ${invoiceResult.images.length} image(s) are from the invoice, and the remaining ${poResult.images.length} image(s) are from the purchase order.`,
+              },
+              ...imageUrlObjects,
+            ],
+          },
+        ],
+        temperature: 0.7,
+        stream: false,
+        max_tokens: 4096,
+      };
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/usf/v1/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const response = await res.json();
+
+      // Extract and parse the JSON content
+      let parsedContent = response;
+
+      if (response.choices && response.choices[0]?.message?.content) {
+        const content = response.choices[0].message.content;
+
+        const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+          try {
+            parsedContent = JSON.parse(jsonMatch[1]);
+          } catch (e) {
+            console.error("Failed to parse JSON from content:", e);
+            parsedContent = { raw_content: content };
+          }
+        } else {
+          try {
+            parsedContent = JSON.parse(content);
+          } catch (e) {
+            parsedContent = { raw_content: content };
+          }
+        }
+      }
+
+      setMatchingResult(parsedContent);
+      toast.success("Comparison complete!", { id: "matching" });
+    } catch (error) {
+      toast.error("Comparison failed", { id: "matching" });
+      console.error("Matching Error:", error);
+    } finally {
+      setIsMatching(false);
+    }
+  };
+
+  const handleUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "invoice" | "po"
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!pdfLibLoaded) {
+      toast.error("PDF library loading...");
+      return;
+    }
+
+    if (file.type !== "application/pdf") {
+      toast.error("PDF files only");
+      return;
+    }
+
+    // Start loading
+    if (type === "invoice") {
+      setInvoiceLoading(true);
+      setInvoiceResult(null);
+    } else {
+      setPOLoading(true);
+      setPOResult(null);
+    }
+
+    try {
+      // Step 1: Convert PDF to images
+      toast.loading(`Converting ${file.name}...`, { id: `convert-${type}` });
+      const images = await convertPDFToImages(file);
+      toast.success(`Converted ${images.length} page(s)`, {
+        id: `convert-${type}`,
+      });
+
+      // Step 2: Automatically process the images
+      toast.loading("Processing with AI...", { id: `process-${type}` });
+      await handleProcess(images, file.name, type);
+      toast.success("Processing complete!", { id: `process-${type}` });
+    } catch (error) {
+      toast.error("Error processing PDF", { id: `process-${type}` });
+      console.error(error);
+    } finally {
+      if (type === "invoice") {
+        setInvoiceLoading(false);
+      } else {
+        setPOLoading(false);
+      }
+    }
+
+    // Reset file input
+    e.target.value = "";
+  };
+
+  const renderTabbedResult = (
+    result: ProcessedResult,
+    activeTab: "preview" | "json",
+    setActiveTab: (tab: "preview" | "json") => void
+  ) => {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-slate-900">
+            {result.fileName}
+          </h3>
+          <div className="flex bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab("preview")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === "preview"
+                  ? "bg-blue-500 text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Image Preview
+            </button>
+            <button
+              onClick={() => setActiveTab("json")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === "json"
+                  ? "bg-blue-500 text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              JSON Response
+            </button>
+          </div>
+        </div>
+
+        {activeTab === "preview" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {result.images.length} page(s)
+            </p>
+            {result.images.map((img) => (
+              <div
+                key={img.pageNumber}
+                className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm"
+              >
+                <div className="mb-3">
+                  <span className="text-sm font-medium text-slate-700">
+                    Page {img.pageNumber}
+                  </span>
+                </div>
+                <div className="rounded-lg overflow-hidden border border-slate-200">
+                  <img
+                    src={img.base64}
+                    alt={`Page ${img.pageNumber}`}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+            <pre className="text-sm text-slate-800 overflow-auto max-h-[600px] whitespace-pre-wrap">
+              {JSON.stringify(result.response, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Manual Upload
+          </h1>
+          <p className="text-slate-600">
+            Upload PDFs for AI-powered data extraction
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          {invoiceResult && poResult && !matchingResult && (
+            <button
+              onClick={handleProceed}
+              disabled={isMatching}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isMatching ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                  <span>Comparing...</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                  <span>Proceed to Match</span>
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={onBack}
+            className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Invoice Section */}
+        <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Invoice Upload
+            </h2>
+            {invoiceResult && (
+              <button
+                onClick={() => setInvoiceResult(null)}
+                className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {!invoiceResult && !invoiceLoading && (
+            <div className="mb-6">
+              <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg
+                    className="w-12 h-12 mb-3 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-400">
+                    <span className="font-semibold">Click to upload</span> or
+                    drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500">PDF files only</p>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="application/pdf"
+                  onChange={(e) => handleUpload(e, "invoice")}
+                />
+              </label>
+            </div>
+          )}
+
+          {invoiceLoading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mb-4"></div>
+              <span className="text-gray-400">Processing...</span>
+            </div>
+          )}
+
+          {invoiceResult &&
+            renderTabbedResult(
+              invoiceResult,
+              invoiceActiveTab,
+              setInvoiceActiveTab
+            )}
+        </div>
+
+        {/* Purchase Order Section */}
+        <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Purchase Order Upload
+            </h2>
+            {poResult && (
+              <button
+                onClick={() => setPOResult(null)}
+                className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {!poResult && !poLoading && (
+            <div className="mb-6">
+              <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg
+                    className="w-12 h-12 mb-3 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-400">
+                    <span className="font-semibold">Click to upload</span> or
+                    drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500">PDF files only</p>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="application/pdf"
+                  onChange={(e) => handleUpload(e, "po")}
+                />
+              </label>
+            </div>
+          )}
+
+          {poLoading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mb-4"></div>
+              <span className="text-gray-400">Processing...</span>
+            </div>
+          )}
+
+          {poResult &&
+            renderTabbedResult(poResult, poActiveTab, setPOActiveTab)}
+        </div>
+      </div>
+
+      {/* Matching Results Section */}
+      {matchingResult && (
+        <div className="mt-8 space-y-6">
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Invoice Comparison Report
+                </h2>
+                <p className="text-blue-100">AI-Powered Document Analysis</p>
+              </div>
+              <button
+                onClick={() => setMatchingResult(null)}
+                className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <p className="text-blue-200 text-sm mb-2">Invoice Number</p>
+                <p className="text-white text-xl font-bold">
+                  {matchingResult.invoice_number || "N/A"}
+                </p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <p className="text-blue-200 text-sm mb-2">PO Number</p>
+                <p className="text-white text-xl font-bold">
+                  {matchingResult.purchase_order_number || "N/A"}
+                </p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <p className="text-blue-200 text-sm mb-2">Risk Score</p>
+                <div className="flex items-center gap-2">
+                  <p
+                    className={`text-2xl font-bold ${
+                      (matchingResult.risk_score || 0) > 70
+                        ? "text-red-300"
+                        : (matchingResult.risk_score || 0) > 40
+                        ? "text-yellow-300"
+                        : "text-green-300"
+                    }`}
+                  >
+                    {matchingResult.risk_score ||
+                      matchingResult.match_score ||
+                      0}
+                    %
+                  </p>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      (matchingResult.risk_score || 0) > 70
+                        ? "bg-red-500/20 text-red-300"
+                        : (matchingResult.risk_score || 0) > 40
+                        ? "bg-yellow-500/20 text-yellow-300"
+                        : "bg-green-500/20 text-green-300"
+                    }`}
+                  >
+                    {(matchingResult.risk_score || 0) > 70
+                      ? "HIGH"
+                      : (matchingResult.risk_score || 0) > 40
+                      ? "MEDIUM"
+                      : "LOW"}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <p className="text-blue-200 text-sm mb-2">Status</p>
+                <span
+                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
+                    matchingResult.document_status === "Matched" ||
+                    matchingResult.overall_status === "matched"
+                      ? "bg-green-500 text-white"
+                      : "bg-yellow-500 text-white"
+                  }`}
+                >
+                  {matchingResult.document_status === "Matched" ||
+                  matchingResult.overall_status === "matched" ? (
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                  )}
+                  {matchingResult.document_status ||
+                    matchingResult.overall_status ||
+                    "Processed"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Field Comparison Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-700 to-slate-600 px-6 py-4">
+              <h3 className="text-lg font-bold text-white">
+                Field-by-Field Comparison
+              </h3>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-1/4">
+                      Field Name
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-1/3">
+                      Invoice Value
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-1/3">
+                      PO Value
+                    </th>
+                    <th className="px-6 py-4 text-center text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {/* Matched Fields */}
+                  {matchingResult.field_level_comparison?.matched_fields &&
+                    Object.entries(
+                      matchingResult.field_level_comparison.matched_fields
+                    ).map(([key, value]: [string, any]) => (
+                      <tr
+                        key={key}
+                        className="hover:bg-green-50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {key
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-700">
+                            {value.invoice || value}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-700">
+                            {value.po || value}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            Match
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+
+                  {/* Mismatched Fields */}
+                  {matchingResult.field_level_comparison?.mismatched_fields &&
+                    Object.entries(
+                      matchingResult.field_level_comparison.mismatched_fields
+                    ).map(([key, value]: [string, any]) => (
+                      <tr
+                        key={key}
+                        className="hover:bg-red-50 transition-colors bg-red-50/30"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {key
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-700 font-medium">
+                            {Array.isArray(value.invoice)
+                              ? `${value.invoice.length} items`
+                              : value.invoice || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-700 font-medium">
+                            {Array.isArray(value.po)
+                              ? `${value.po.length} items`
+                              : value.po || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                            Mismatch
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm font-medium text-slate-700">
+                    {matchingResult.field_level_comparison?.matched_fields
+                      ? Object.keys(
+                          matchingResult.field_level_comparison.matched_fields
+                        ).length
+                      : 0}{" "}
+                    Matched
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-sm font-medium text-slate-700">
+                    {matchingResult.field_level_comparison?.mismatched_fields
+                      ? Object.keys(
+                          matchingResult.field_level_comparison
+                            .mismatched_fields
+                        ).length
+                      : 0}{" "}
+                    Mismatched
+                  </span>
+                </div>
+              </div>
+              <div className="text-sm text-slate-600">
+                Total Fields:{" "}
+                {(matchingResult.field_level_comparison?.matched_fields
+                  ? Object.keys(
+                      matchingResult.field_level_comparison.matched_fields
+                    ).length
+                  : 0) +
+                  (matchingResult.field_level_comparison?.mismatched_fields
+                    ? Object.keys(
+                        matchingResult.field_level_comparison.mismatched_fields
+                      ).length
+                    : 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Detected Anomalies */}
+          {matchingResult.detected_anomalies &&
+            matchingResult.detected_anomalies.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                  Detected Anomalies
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {matchingResult.detected_anomalies.map(
+                    (anomaly: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full"
+                      >
+                        {anomaly}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+          {/* Justification */}
+          {matchingResult.justification && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-blue-900 mb-3">
+                Analysis & Justification
+              </h3>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                {matchingResult.justification}
+              </p>
+            </div>
+          )}
+
+          {/* Confidence Scores */}
+          {matchingResult.confidence_scores && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Confidence Scores
+              </h3>
+              <div className="grid grid-cols-5 gap-4">
+                {Object.entries(matchingResult.confidence_scores).map(
+                  ([key, value]: [string, any]) => (
+                    <div
+                      key={key}
+                      className="text-center bg-slate-50 rounded-lg p-4"
+                    >
+                      <p className="text-xs text-slate-500 mb-2">
+                        {key
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {Math.round((value as number) * 100)}%
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Raw JSON View */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+            <details>
+              <summary className="px-6 py-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 transition-colors">
+                View Complete JSON Response
+              </summary>
+              <div className="px-6 pb-6">
+                <pre className="text-xs text-slate-800 overflow-auto max-h-96 whitespace-pre-wrap bg-slate-50 p-4 rounded border border-slate-200">
+                  {JSON.stringify(matchingResult, null, 2)}
+                </pre>
+              </div>
+            </details>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
